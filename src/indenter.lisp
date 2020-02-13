@@ -1,0 +1,206 @@
+(in-package :cl-indentify)
+
+(defclass indenter ()
+  ((indent-numbers
+     :reader indent-numbers
+     :initform (make-hash-table :test 'equalp))))
+
+(defun imported-symbol-name (name)
+  (when-let ((pos (position #\: name)))
+    (subseq name (1+ pos))))
+
+(defun indent-number (instance name)
+  (with-slots (indent-numbers) instance
+    (let ((normalized-name (uiop:standard-case-symbol-name name)))
+      (or (gethash normalized-name indent-numbers)
+          (gethash (imported-symbol-name name) indent-numbers)
+          -1))))
+
+(defun (setf indent-number) (value instance name)
+  (setf (gethash (uiop:standard-case-symbol-name name) (indent-numbers instance)) value))
+
+(defparameter +default-indent-numbers+
+  '((assert 2)
+    (block 0)
+    (case 1)
+    (defclass 1)
+    (defconstant 1)
+    (defgeneric 2)
+    (define-compiler-macro 2)
+    (define-condition 1)
+    (define-method-combination 2)
+    (define-modify-macro 2)
+    (define-setf-expander 2)
+    (define-symbol-macro 2)
+    (defmacro 2)
+    (defmethod 2)
+    (defpackage 1)
+    (defparameter 1)
+    (defsetf 2)
+    (defstruct 1)
+    (deftype 1)
+    (defun 2)
+    (defvar 1)
+    (destructuring-bind 2)
+    (do 2)
+    (do* 2)
+    (do-all-symbols 1)
+    (do-external-symbols 1)
+    (dolist 1)
+    (do-symbols 1)
+    (dotimes 1)
+    (ecase 1)
+    (etypecase 1)
+    (eval-when 1)
+    (flet 1)
+    (handler-bind 0)
+    (handler-case 1)
+    (if 1)
+    (labels 1)
+    (lambda 1)
+    (let 1)
+    (let* 1)
+    (let-values 1)
+    (loop 0)
+    (macrolet 1)
+    (multiple-value-bind 2)
+    (prog1 1)
+    (typecase 1)
+    (unless 1)
+    (unwind-protect 1)
+    (when 1)
+    (with-input-from-string 1)
+    (with-open-file 1)
+    (with-open-socket 1)
+    (with-open-stream 1)
+    (with-output-to-string 1)
+    (with-slots 2)))
+
+(defun load-default-indents (instance)
+  (dolist (p +default-indent-numbers+)
+    (setf (indent-number instance (car p)) (cadr p))))
+
+(defun load-user-indents (instance)
+  (with-open-file (indents-stream (uiop:xdg-config-home "cl-indentify" "indents.lisp") :if-does-not-exist nil)
+    (when indents-stream
+      (do ((q (read indents-stream nil) (read indents-stream nil)))
+          ((not q))
+        (let ((num (car (last q))))
+          (dolist (name (butlast q))
+            (setf (indent-number instance name) num)))))))
+
+(defun past-next-atom (s i n)
+  (loop
+    (when (>= i n) (return n))
+    (let ((c (char s i)))
+      (cond ((char= c #\\) (incf i))
+            ((member c '(#\space #\tab #\( #\) #\[ #\] #\" #\' #\` #\, #\;))
+             (return i))))
+    (incf i)))
+
+(defun literal-token-p (s)
+  (let ((colon-pos (position #\: s)))
+    (if colon-pos
+      (= colon-pos 0)
+      (let ((s (read-from-string s)))
+        (or (characterp s) (numberp s) (stringp s))))))
+
+(defstruct lparen
+  spaces-before
+  lisp-indent-num
+  num-finished-subforms)
+
+(defun calc-subindent (instance s i n)
+  (let* ((j (past-next-atom s i n))
+         (lisp-indent-num 0)
+         (delta-indent
+           (if (= j i) 0
+             (let ((w (subseq s i j)))
+               (if (or (and (>= i 2) (member (char s (- i 2)) '(#\' #\`)))
+                       (literal-token-p w)) 0
+                 (progn (setq lisp-indent-num (indent-number instance w))
+                        (case lisp-indent-num
+                          ((-2) 0)
+                          ((-1) (if (< j n) (+ (- j i) 1) 1))
+                          (t 1))))))))
+    (values delta-indent lisp-indent-num j)))
+
+(defun num-leading-spaces (s)
+  (let ((n (length s))
+        (i 0) (j 0))
+    (loop
+      (when (>= i n) (return 0))
+      (case (char s i)
+        (#\space (incf i) (incf j))
+        (#\tab (incf i) (incf j 8))
+        (t (return j))))))
+
+(defun string-trim-blanks (s)
+  (string-trim '(#\space #\tab #\newline #\return) s))
+
+(defun indent-lines (instance)
+  (let ((left-i 0) (paren-stack '()) (inside-stringp nil))
+    (loop
+      (let* ((curr-line (or (read-line nil nil) (return)))
+             (leading-spaces (num-leading-spaces curr-line))
+             (curr-left-i
+               (cond (inside-stringp leading-spaces)
+                     ((null paren-stack)
+                      (when (= left-i 0) (setq left-i leading-spaces))
+                      left-i)
+                     (t (let* ((lp (car paren-stack))
+                               (nas (lparen-lisp-indent-num lp))
+                               (nfs (lparen-num-finished-subforms lp))
+                               (extra-w 0))
+                          (when (< nfs nas) ;(and (>= nas 0) (< nfs nas))
+                            (incf (lparen-num-finished-subforms lp))
+                            (setq extra-w 2))
+                          (+ (lparen-spaces-before lp)
+                             extra-w))))))
+        (setq curr-line (string-trim-blanks curr-line))
+        (dotimes (k curr-left-i) (write-char #\space))
+        (princ curr-line) (terpri)
+        ;
+        (let ((i 0) (n (length curr-line)) (escapep nil)
+              (token-interstice-p nil))
+          (flet ((incr-finished-subforms ()
+                                         (unless token-interstice-p
+                                           (when paren-stack
+                                             (incf (lparen-num-finished-subforms
+                                                     (car paren-stack))))
+                                           (setq token-interstice-p t))))
+            ;
+            (loop
+              (when (>= i n) (return))
+              (let ((c (char curr-line i)))
+                (cond (escapep (setq escapep nil))
+                      ((char= c #\\) (setq token-interstice-p nil escapep t))
+                      (inside-stringp (when (char= c #\")
+                                        (setq inside-stringp nil)
+                                        (incr-finished-subforms)))
+                      ((char= c #\;) (incr-finished-subforms) (return))
+                      ((char= c #\") (incr-finished-subforms) (setq inside-stringp t))
+                      ((member c '(#\space #\tab) :test #'char=)
+                       (incr-finished-subforms))
+                      ((member c '(#\( #\[) :test #'char=)
+                       (incr-finished-subforms)
+                       (multiple-value-bind (delta-indent lisp-indent-num j)
+                           (calc-subindent instance curr-line (1+ i) n)
+                         (push (make-lparen :spaces-before (+ 1 i curr-left-i delta-indent)
+                                            :lisp-indent-num lisp-indent-num
+                                            :num-finished-subforms -1)
+                               paren-stack)
+                         (setq token-interstice-p t)
+                         (let ((inext (1+ i)))
+                           (when (> j inext)
+                             (setq inext j token-interstice-p nil))
+                           (setq i (1- inext)))))
+                      ((member c '(#\) #\]) :test #'char=)
+                       (setq token-interstice-p nil)
+                       (cond (paren-stack (pop paren-stack))
+                             (t (setq left-i 0))))
+                      (t (setq token-interstice-p nil))))
+              (incf i))
+            (incr-finished-subforms)))))))
+
+

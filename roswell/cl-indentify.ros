@@ -1,0 +1,25 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -- $0 "$@"
+|#
+(progn ;;init forms
+  (ros:ensure-asdf)
+  #+quicklisp(ql:quickload '(:cl-indentify) :silent t)
+  )
+
+(defpackage :ros.script.cl-indentify.3790531050
+  (:use :cl))
+(in-package :ros.script.cl-indentify.3790531050)
+
+(defun main (&optional in &rest argv)
+  (declare (ignorable argv))
+  (let ((i (make-instance 'cl-indentify:indenter)))
+    (cl-indentify:load-default-indents i)
+    (cl-indentify:load-user-indents i)
+    (if in
+      (with-open-file (*standard-input* in)
+        (cl-indentify:indent-lines i))
+      (cl-indentify:indent-lines i))))
+
+;;; vim: set ft=lisp lisp:
