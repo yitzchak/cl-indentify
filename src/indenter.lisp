@@ -90,13 +90,13 @@
             (setf (indent-number instance name) num)))))))
 
 (defun past-next-atom (s i n)
-  (loop
-    (when (>= i n) (return n))
-    (let ((c (char s i)))
-      (cond ((char= c #\\) (incf i))
-            ((member c '(#\space #\tab #\( #\) #\[ #\] #\" #\' #\` #\, #\;))
-             (return i))))
-    (incf i)))
+  (do ((j i (1+ j)))
+      ((>= j n) n)
+    (case (char s j)
+      (#\\
+       (incf j))
+      ((#\space #\tab #\( #\) #\[ #\] #\" #\' #\` #\, #\;)
+       (return j)))))
 
 (defun literal-token-p (s)
   (let ((colon-pos (position #\: s)))
