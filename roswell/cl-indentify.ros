@@ -19,7 +19,7 @@ exec ros -Q -- $0 "$@"
     (cl-indentify:load-user-indents i)
     (if in
       (with-open-file (*standard-input* in)
-        (cl-indentify:indent-lines i))
-      (cl-indentify:indent-lines i))))
+        (cl-indentify:indentify i))
+      (cl-indentify:indentify i))))
 
 ;;; vim: set ft=lisp lisp:

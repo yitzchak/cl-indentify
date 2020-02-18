@@ -27,7 +27,10 @@
      :initarg :output-stream)
    (newline
      :accessor newline
-     :initarg t)
+     :initform t)
+   (column
+     :accessor column
+     :initform 0)
    (current-indent
      :accessor current-indent
      :initform 0)
@@ -49,8 +52,7 @@
   (with-slots (indent-numbers) instance
     (let ((normalized-name (uiop:standard-case-symbol-name name)))
       (or (gethash normalized-name indent-numbers)
-          (gethash (imported-symbol-name name) indent-numbers)
-          -1))))
+          (gethash (imported-symbol-name name) indent-numbers)))))
 
 (defun (setf indent-number) (value instance name)
   (setf (gethash (uiop:standard-case-symbol-name name) (indent-numbers instance)) value))
@@ -275,55 +277,120 @@
         (terpri)
         (scan-line instance state line-indent curr-line)))))
 
-(defun scan-char (state &key (echo t))
-  (when-let ((ch (read-char (input-stream state) t)))
-    (if echo
-      (write-char ch (output-stream state))
-      ch)))
+(defun scan-char (instance state &key (echo t))
+  (with-slots (input-stream output-stream column) state
+    (when-let ((ch (read-char input-stream t)))
+      (case ch
+        (#\Tab
+          (incf column (tab-size instance)))
+        (#\Newline
+          (setf column 0))
+        ((#\Backspace #\Page #\Return #\Rubout))
+        (otherwise
+          (incf column)))
+      (if echo
+        (write-char ch output-stream)
+        ch))))
+
+(defun unscan-char (instance state ch)
+  (with-slots (column) state
+    (unread-char ch (input-stream state))
+    (case ch
+      (#\Tab
+        (decf column (tab-size instance)))
+      ((#\Backspace #\Newline #\Page #\Return #\Rubout))
+      (otherwise
+        (decf column)))))
+
+(defmacro doscan (var instance state &body body)
+  (with-gensyms (inst st)
+    `(do* ((,inst ,instance)
+           (,st ,state)
+           (,var (scan-char ,inst ,st) (scan-char ,inst ,st)))
+         ((not ,var))
+       ,@body)))
 
 (defun scan-string (instance state)
-  (scan-char state)
-  (do ((ch (scan-char state) (scan-char state)))
+  (scan-char instance state)
+  (do ((ch (scan-char instance state) (scan-char instance state)))
       ((char= ch #\"))
     (when (char= ch #\\)
-      (scan-char state)))
+      (scan-char instance state)))
   (incr-finished-subforms instance state))
 
-(defun scan-line-comment (instance state)
-  (declare (ignore instance))
-  (do ((ch (scan-char state) (scan-char state)))
-      ((not ch))
-    (when (char= ch #\Newline)
-      (setf (newline state) t)
-      (return t))))
-
-(defun scan-indent (instance state)
-  (with-slots (input-stream output-stream) state
-    (do ((ch (peek-char nil input-stream nil) (peek-char nil input-stream nil))
-         (indent 0))
+(defun scan-indent (instance state indent)
+  (with-slots (column output-stream) state
+    (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
         ((not ch))
       (case ch
-        (#\Space
-          (read-char input-stream nil)
-          (incf indent))
-        (#\Tab
-          (read-char input-stream nil)
-          (incf indent (tab-size instance)))
+        ((#\Space #\Tab))
         (otherwise
-          (dotimes (k (calculate-line-indent instance state indent))
+          (unscan-char instance state ch)
+          (setf column indent)
+          (dotimes (k column)
             (write-char #\Space output-stream))
-          (return t))))))
+          (return))))))
 
-;(defun indentify (instance &optional input-stream output-stream)
-;  (do ((state (make-instance 'indenter-state :input-stream (or input-stream *standard-input*)
-;                                             :output-stream (or output-stream *standard-output*)))
-;       (ch (peek-char nil input-stream nil)
+(defun scan-line-comment (instance state)
+  (doscan ch instance state
+    (when (char= ch #\Newline)
+      (unscan-char instance state ch)
+      (return t))))
 
-;  (do ((ch (read-char input-stream t) (read-char input-stream t))
-;       (in-indent t)
-;       (in-string nil)
-;       (in-comment nil)
-;       (current-indent 0))
-;    (if in-indent
+(defun scan-token (instance state)
+  (with-output-to-string (token-stream)
+    (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
+        ((not ch))
+      (case ch
+        ((#\Space #\Newline #\( #\) #\' #\` #\, #\@ #\;)
+          (unscan-char instance state ch)
+          (return))
+        (otherwise
+          (write-char ch token-stream)
+          (write-char ch (output-stream state)))))))
 
-    
+(defun scan-forms (instance state)
+  (do* ((indent (column state))
+        (primary-indent (1+ indent))
+        (secondary-indent primary-indent)
+        (primary-form-count nil)
+        (completed-form-count 0)
+        (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
+      ((not ch))
+    (case ch
+      (#\Newline
+        (write-char ch (output-stream state))
+        (scan-indent instance state
+          (cond
+            ((not primary-form-count) indent)
+            ((>= completed-form-count primary-form-count)
+              secondary-indent)
+            (t primary-indent)))
+        (setq indent (column state)))
+      (#\"
+        (scan-string instance state)
+        (incf completed-form-count))
+      ((#\Space #\Tab)
+        (when (= 1 completed-form-count)
+          (setf primary-indent (column state)))
+        (write-char ch (output-stream state)))
+      ((#\' #\` #\@)
+        (write-char ch (output-stream state)))
+      ((#\( #\[)
+        (write-char ch (output-stream state))
+        (scan-forms instance state))
+      ((#\) #\])
+        (write-char ch (output-stream state))
+        (return t))
+      (t
+        (unscan-char instance state ch)
+        (let ((token (scan-token instance state)))
+          (when (zerop completed-form-count)
+            (setf primary-form-count (indent-number instance token))))
+        (incf completed-form-count)))))
+
+(defun indentify (instance &optional input-stream output-stream)
+  (scan-forms instance
+    (make-instance 'indenter-state :input-stream (or input-stream *standard-input*)
+                                   :output-stream (or output-stream *standard-output*))))
+
