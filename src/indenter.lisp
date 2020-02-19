@@ -276,9 +276,9 @@
           (return '(:form)))))))
 
 (defun indentify (instance &optional input-stream output-stream)
-  (scan-forms
-    instance
-    (make-instance 'indenter-state
-                    :input-stream (or input-stream *standard-input*)
-                    :output-stream (or output-stream *standard-output*))))
+  (let ((state (make-instance 'indenter-state
+                              :input-stream (or input-stream *standard-input*)
+                              :output-stream (or output-stream *standard-output*))))
+    (scan-indent instance state)
+    (scan-forms state)))
 

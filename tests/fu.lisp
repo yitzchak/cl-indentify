@@ -31,5 +31,5 @@
       c)
 
 (defun #| block comment |#
-bar (x)
-(1+ x))
+    bar (x)
+  (1+ x))
