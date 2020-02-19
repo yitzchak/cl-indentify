@@ -44,15 +44,24 @@
      :accessor in-string
      :initform nil)))
 
+(defun literal-token-p (s)
+  (let ((colon-pos (position #\: s)))
+    (if colon-pos
+      (= colon-pos 0)
+      (let ((s (read-from-string s)))
+        (or (characterp s) (numberp s) (stringp s))))))
+
 (defun imported-symbol-name (name)
   (when-let ((pos (position #\: name)))
     (subseq name (1+ pos))))
 
 (defun indent-number (instance name)
-  (with-slots (indent-numbers) instance
-    (let ((normalized-name (uiop:standard-case-symbol-name name)))
-      (or (gethash normalized-name indent-numbers)
-          (gethash (imported-symbol-name name) indent-numbers)))))
+  (unless (literal-token-p name)
+    (with-slots (indent-numbers) instance
+      (let ((normalized-name (uiop:standard-case-symbol-name name)))
+        (or (gethash normalized-name indent-numbers)
+            (gethash (imported-symbol-name name) indent-numbers)
+            0)))))
 
 (defun (setf indent-number) (value instance name)
   (setf (gethash (uiop:standard-case-symbol-name name) (indent-numbers instance)) value))
@@ -135,13 +144,6 @@
        (incf j))
       ((#\space #\tab #\( #\) #\[ #\] #\" #\' #\` #\, #\;)
        (return j)))))
-
-(defun literal-token-p (s)
-  (let ((colon-pos (position #\: s)))
-    (if colon-pos
-      (= colon-pos 0)
-      (let ((s (read-from-string s)))
-        (or (characterp s) (numberp s) (stringp s))))))
 
 (defclass lparen ()
   ((spaces-before
@@ -279,7 +281,7 @@
 
 (defun scan-char (instance state &key (echo t))
   (with-slots (input-stream output-stream column) state
-    (when-let ((ch (read-char input-stream t)))
+    (when-let ((ch (read-char input-stream nil)))
       (case ch
         (#\Tab
           (incf column (tab-size instance)))
@@ -351,38 +353,49 @@
 
 (defun scan-forms (instance state)
   (do* ((indent (column state))
-        (primary-indent (1+ indent))
-        (secondary-indent primary-indent)
+        (primary-indent (+ 3 indent))
+        (secondary-indent (1+ indent))
         (primary-form-count nil)
         (completed-form-count 0)
+        (previous-column (column state) (column state))
         (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
-      ((not ch))
+       ((not ch))
     (case ch
       (#\Newline
         (write-char ch (output-stream state))
         (scan-indent instance state
           (cond
             ((not primary-form-count) indent)
-            ((>= completed-form-count primary-form-count)
+            ((> completed-form-count primary-form-count)
               secondary-indent)
-            (t primary-indent)))
-        (setq indent (column state)))
+            (t primary-indent))))
       (#\"
+        (when (and primary-form-count (= 1 completed-form-count))
+          (setf primary-indent previous-column))
+        (when (and primary-form-count (= (1+ primary-form-count) completed-form-count))
+          (setf secondary-indent previous-column))
         (scan-string instance state)
         (incf completed-form-count))
       ((#\Space #\Tab)
-        (when (= 1 completed-form-count)
-          (setf primary-indent (column state)))
         (write-char ch (output-stream state)))
       ((#\' #\` #\@)
         (write-char ch (output-stream state)))
       ((#\( #\[)
+        (when (and primary-form-count (= 1 completed-form-count))
+          (setf primary-indent previous-column))
+        (when (and primary-form-count (= (1+ primary-form-count) completed-form-count))
+          (setf secondary-indent previous-column))
         (write-char ch (output-stream state))
-        (scan-forms instance state))
+        (scan-forms instance state)
+        (incf completed-form-count))
       ((#\) #\])
         (write-char ch (output-stream state))
         (return t))
       (t
+        (when (and primary-form-count (= 1 completed-form-count))
+          (setf primary-indent previous-column))
+        (when (and primary-form-count (= (1+ primary-form-count) completed-form-count))
+          (setf secondary-indent previous-column))
         (unscan-char instance state ch)
         (let ((token (scan-token instance state)))
           (when (zerop completed-form-count)
@@ -390,7 +403,9 @@
         (incf completed-form-count)))))
 
 (defun indentify (instance &optional input-stream output-stream)
-  (scan-forms instance
-    (make-instance 'indenter-state :input-stream (or input-stream *standard-input*)
-                                   :output-stream (or output-stream *standard-output*))))
+  (scan-forms
+    instance
+    (make-instance 'indenter-state
+                    :input-stream (or input-stream *standard-input*)
+                    :output-stream (or output-stream *standard-output*))))
 
