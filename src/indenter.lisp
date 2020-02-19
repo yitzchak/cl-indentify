@@ -124,6 +124,32 @@
             (write-char ch token-stream)
             (write-char ch (output-stream state))))))))
 
+(defun scan-sharpsign-backslash (instance state)
+  (do ((pos 0 (1+ pos))
+       (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
+      ((not ch))
+    (case ch
+      ((#\Space #\Newline)
+        (unscan-char instance state ch)
+        (return))
+      ((#\( #\) #\' #\` #\, #\@ #\;)
+        (if (zerop pos)
+          (write-char ch (output-stream state))
+          (progn
+            (unscan-char instance state ch)
+            (return))))
+      (otherwise
+        (write-char ch (output-stream state)))))
+  '(:form))
+
+(defun scan-sharpsign (instance state)
+  (let ((ch (scan-char instance state)))
+    (case ch
+      (#\\
+        (scan-sharpsign-backslash instance state))
+      (otherwise
+        '(:form)))))
+
 (defun scan-chunk (instance state)
   (with-slots (output-stream) state
     (let ((ch (scan-char instance state :echo nil)))
@@ -137,6 +163,9 @@
         (#\;
           (write-char ch (output-stream state))
           (scan-line-comment instance state))
+        (#\#
+          (write-char ch (output-stream state))
+          (scan-sharpsign instance state))
         ((#\Space #\Tab)
           (write-char ch (output-stream state))
           '(:space))
@@ -181,13 +210,14 @@
           (dotimes (k column)
             (write-char #\Space output-stream)))
         (:form
-          (when (and primary-form-count (= 1 completed-form-count))
-            (setf primary-indent previous-column))
-          (when (and primary-form-count (= (1+ primary-form-count) completed-form-count))
-            (setf secondary-indent previous-column))
-          (when (and (cadr form) (zerop completed-form-count))
-            (setf primary-form-count (indent-number instance (cadr form))))
-          (incf completed-form-count))
+          (incf completed-form-count)
+          (cond
+            ((and (= 1 completed-form-count) (cadr form))
+              (setf primary-form-count (indent-number instance (cadr form))))
+            ((and primary-form-count (= 1 completed-form-count))
+              (setf primary-indent previous-column))
+            ((and primary-form-count (= (+ 2 primary-form-count) completed-form-count))
+              (setf secondary-indent previous-column))))
         (:exit
           (return '(:form)))))))
 

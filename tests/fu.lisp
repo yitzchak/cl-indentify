@@ -7,8 +7,9 @@
 
 (case ; Oddly placed comment
     fu
-  (1 nil)
-  (2 t)
+  (#\) nil)
+  (#\Space
+   t)
   (3 5))
 
 (block
