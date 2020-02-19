@@ -280,5 +280,5 @@
                               :input-stream (or input-stream *standard-input*)
                               :output-stream (or output-stream *standard-output*))))
     (scan-indent instance state)
-    (scan-forms state)))
+    (scan-forms instance state)))
 
