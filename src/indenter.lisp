@@ -1,11 +1,5 @@
 (in-package :cl-indentify)
 
-(defmacro dostring ((var string-form &optional resultform) &rest body)
-  (with-gensyms (string-val pos)
-    `(let ((,string-val ,string-form))
-	     (dotimes (,pos (length ,string-val) ,resultform)
-	       (let ((,var (char ,string-val ,pos))) ,@body)))))
-
 (defclass indenter ()
   ((indent-numbers
      :reader indent-numbers
@@ -16,33 +10,15 @@
      :initarg :tab-size)))
 
 (defclass indenter-state ()
-  ((paren-stack
-     :accessor paren-stack
-     :initform nil)
-   (input-stream
+  ((input-stream
      :accessor input-stream
      :initarg :input-stream)
    (output-stream
      :accessor output-stream
      :initarg :output-stream)
-   (newline
-     :accessor newline
-     :initform t)
    (column
      :accessor column
-     :initform 0)
-   (current-indent
-     :accessor current-indent
-     :initform 0)
-   (token-interstice
-     :accessor token-interstice
-     :initform nil)
-   (in-comment
-     :accessor in-comment
-     :initform nil)
-   (in-string
-     :accessor in-string
-     :initform nil)))
+     :initform 0)))
 
 (defun literal-token-p (s)
   (let ((colon-pos (position #\: s)))
@@ -136,149 +112,6 @@
           (dolist (name (butlast q))
             (setf (indent-number instance name) num)))))))
 
-(defun past-next-atom (s i n)
-  (do ((j i (1+ j)))
-      ((>= j n) n)
-    (case (char s j)
-      (#\\
-       (incf j))
-      ((#\space #\tab #\( #\) #\[ #\] #\" #\' #\` #\, #\;)
-       (return j)))))
-
-(defclass lparen ()
-  ((spaces-before
-     :accessor spaces-before
-     :initform 0
-     :initarg :spaces-before)
-   (lisp-indent-num
-     :accessor lisp-indent-num
-     :initform 0
-     :initarg :lisp-indent-num)
-   (num-finished-subforms
-     :accessor num-finished-subforms
-     :initform -1
-     :initarg :num-finished-subforms)))
-
-(defun calc-subindent (instance s i n)
-  (let* ((j (past-next-atom s i n))
-         (lisp-indent-num 0)
-         (delta-indent
-           (if (= j i) 0
-             (let ((w (subseq s i j)))
-               (if (or (and (>= i 2) (member (char s (- i 2)) '(#\' #\`)))
-                       (literal-token-p w)) 0
-                 (progn (setq lisp-indent-num (indent-number instance w))
-                        (case lisp-indent-num
-                          ((-2) 0)
-                          ((-1) (if (< j n) (+ (- j i) 1) 1))
-                          (t 1))))))))
-    (values delta-indent lisp-indent-num j)))
-
-(defun num-leading-spaces (s)
-  (let ((n (length s))
-        (i 0) (j 0))
-    (loop
-      (when (>= i n) (return 0))
-      (case (char s i)
-        (#\space (incf i) (incf j))
-        (#\tab (incf i) (incf j 8))
-        (t (return j))))))
-
-(defun remove-indent (instance line)
-  (with-slots (tab-size) instance
-    (do ((pos 0 (1+ pos))
-         (indent-count 0))
-        ((>= pos (length line)) (values indent-count ""))
-      (case (char line pos)
-        (#\space (incf indent-count))
-        (#\tab (incf indent-count tab-size))
-        (otherwise (return (values indent-count (subseq line pos))))))))
-
-(defun string-trim-blanks (s)
-  (string-trim '(#\space #\tab #\newline #\return) s))
-
-(defun calculate-line-indent (instance state leading-spaces)
-  (declare (ignore instance))
-  (with-slots (paren-stack in-string current-indent) state
-    (cond
-      (in-string leading-spaces)
-      ((null paren-stack)
-        (if (zerop current-indent)
-          (setf current-indent leading-spaces)
-          current-indent))
-      (t
-        (with-slots (spaces-before lisp-indent-num num-finished-subforms) (car paren-stack)
-          (cond
-            ((< num-finished-subforms lisp-indent-num) ;(and (>= lisp-indent-num 0) (< num-finished-subforms lisp-indent-num))
-              (incf num-finished-subforms)
-              (+ spaces-before 2))
-            (t
-              spaces-before)))))))
-
-(defun incr-finished-subforms (instance state)
-  (declare (ignore instance))
-  (with-slots (token-interstice paren-stack) state
-    (unless token-interstice
-      (when paren-stack
-        (incf (num-finished-subforms (car paren-stack))))
-      (setf token-interstice t))))
-
-(defun scan-line (instance state line-indent curr-line)
-  (with-slots (paren-stack token-interstice current-indent in-string) state
-    (setf token-interstice nil)
-    (do ((pos 0 (1+ pos)))
-        ((>= pos (length curr-line)))
-      (let ((ch (char curr-line pos)))
-        (cond
-          ((char= ch #\\)
-            (setf token-interstice nil)
-            (incf pos))
-          (in-string
-            (when (char= ch #\")
-              (setf in-string nil)
-              (incr-finished-subforms instance state)))
-          ((char= ch #\;)
-            (incr-finished-subforms instance state)
-            (return))
-          ((char= ch #\")
-            (incr-finished-subforms instance state)
-            (setf in-string t))
-          ((member ch '(#\space #\tab) :test #'char=)
-            (incr-finished-subforms instance state))
-          ((or (char= ch #\() (char= ch #\[))
-            (incr-finished-subforms instance state)
-            (multiple-value-bind (delta-indent lisp-indent-num j)
-                                 (calc-subindent instance curr-line (1+ pos) (length curr-line))
-              (push (make-instance 'lparen :spaces-before (+ 1 pos line-indent delta-indent)
-                                           :lisp-indent-num lisp-indent-num)
-                    paren-stack)
-              (setf token-interstice t)
-              (let ((inext (1+ pos)))
-                (when (> j inext)
-                  (setq inext j)
-                  (setf token-interstice nil))
-                (setq pos (1- inext)))))
-          ((member ch '(#\) #\]) :test #'char=)
-            (setf token-interstice nil)
-            (if paren-stack
-              (pop paren-stack)
-              (setf current-indent 0)))
-          (t
-            (setf token-interstice nil))))
-      (incr-finished-subforms instance state))))
-
-(defun indent-lines (instance)
-  (do ((state (make-instance 'indenter-state))
-       (line (read-line nil nil) (read-line nil nil)))
-      ((null line))
-    (multiple-value-bind (leading-spaces curr-line) (remove-indent instance line)
-      (let ((line-indent (calculate-line-indent instance state leading-spaces)))
-        (dotimes (k line-indent)
-          (write-char #\space))
-        (princ curr-line)
-        (terpri)
-        (scan-line instance state line-indent curr-line)))))
-
 (defun scan-char (instance state &key (echo t))
   (with-slots (input-stream output-stream column) state
     (when-let ((ch (read-char input-stream nil)))
@@ -326,16 +159,17 @@
   '(:indent))
 
 (defun scan-line-comment (instance state)
-  (do ((ch (scan-char instance state) (scan-char instance state)))
+  (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
       ((not ch))
     (when (char= ch #\Newline)
       (unscan-char instance state ch)
-      (return)))
+      (return))
+    (write-char ch (output-stream state)))
   '(:space))
 
 (defun scan-token (instance state)
   (list
-    :token
+    :form
     (with-output-to-string (token-stream)
       (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
           ((not ch))
@@ -347,16 +181,19 @@
             (write-char ch token-stream)
             (write-char ch (output-stream state))))))))
 
-(defun scan-form (instance state)
+(defun scan-chunk (instance state)
   (with-slots (output-stream) state
     (let ((ch (scan-char instance state :echo nil)))
       (case ch
-        (nil)
         (#\Newline
           (write-char ch (output-stream state))
           (scan-indent instance state))
         (#\"
+          (write-char ch (output-stream state))
           (scan-string instance state))
+        (#\;
+          (write-char ch (output-stream state))
+          (scan-line-comment instance state))
         ((#\Space #\Tab)
           (write-char ch (output-stream state))
           '(:space))
@@ -369,9 +206,16 @@
         ((#\) #\])
           (write-char ch (output-stream state))
           '(:exit))
-        (t
+        (otherwise
           (unscan-char instance state ch)
           (scan-token instance state))))))
+
+(defun scan-form (instance state)
+  (with-slots (output-stream) state
+    (do ((chunk (scan-chunk instance state) (scan-chunk instance state)))
+        ((not chunk))
+      (unless (eql (car chunk) :space)
+        (return chunk)))))
 
 (defun scan-forms (instance state)
   (with-slots (column output-stream) state
@@ -381,7 +225,7 @@
           (primary-form-count nil)
           (completed-form-count 0)
           (previous-column column column)
-          (form (scan-form instance state) (scan-form instance state)))
+          (form (scan-chunk instance state) (scan-chunk instance state)))
          ((not form))
       (case (car form)
         (:indent

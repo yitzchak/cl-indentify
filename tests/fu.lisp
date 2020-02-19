@@ -5,7 +5,7 @@
        '(1 2
          4)))
 
-(case
+(case ; Oddly placed comment
     fu
   (1 nil)
   (2 t)
