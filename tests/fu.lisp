@@ -11,7 +11,7 @@
     fu
   (#\) nil)
   (#\Space
-   t)
+    t)
   (3 5))
 
 (block
@@ -32,4 +32,15 @@
 
 (defun #| block comment |#
     bar (x)
-  (1+ x))
+  (cond
+    ((numberp x)
+      (1+ x))
+    (t
+      x)))
+
+(defclass foo ()
+  ((wibble
+     :accessor wibble
+     :initarg :wibble)
+   (gronk :accessor gronk
+          :initarg :gronk)))

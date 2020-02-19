@@ -5,6 +5,6 @@
     #:load-user-indents
     #:indenter
     #:indentify
-    #:indent-number))
+    #:indent-template))
 
 

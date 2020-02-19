@@ -1,8 +1,8 @@
 (in-package :cl-indentify)
 
 (defclass indenter ()
-  ((indent-numbers
-     :reader indent-numbers
+  ((indent-templates
+     :reader indent-templates
      :initform (make-hash-table :test 'equalp))
    (tab-size
      :accessor tab-size
@@ -31,29 +31,27 @@
   (when-let ((pos (position #\: name)))
     (subseq name (1+ pos))))
 
-(defun indent-number (instance name)
+(defun indent-template (instance name)
   (unless (literal-token-p name)
-    (with-slots (indent-numbers) instance
+    (with-slots (indent-templates) instance
       (let ((normalized-name (uiop:standard-case-symbol-name name)))
-        (or (gethash normalized-name indent-numbers)
-            (gethash (imported-symbol-name name) indent-numbers)
-            0)))))
+        (or (gethash normalized-name indent-templates)
+            (gethash (imported-symbol-name name) indent-templates)
+            '(0))))))
 
-(defun (setf indent-number) (value instance name)
-  (setf (gethash (uiop:standard-case-symbol-name name) (indent-numbers instance)) value))
+(defun (setf indent-template) (value instance name)
+  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance)) value))
 
 (defun load-default-indents (instance)
-  (dolist (p +default-indent-numbers+)
-    (setf (indent-number instance (car p)) (cadr p))))
+  (dolist (p +default-indent-templates+)
+    (setf (indent-template instance (car p)) (cdr p))))
 
 (defun load-user-indents (instance)
   (with-open-file (indents-stream (uiop:xdg-config-home "cl-indentify" "indents.lisp") :if-does-not-exist nil)
     (when indents-stream
       (do ((q (read indents-stream nil) (read indents-stream nil)))
           ((not q))
-        (let ((num (car (last q))))
-          (dolist (name (butlast q))
-            (setf (indent-number instance name) num)))))))
+        (setf (indent-template instance (car q)) (cdr q))))))
 
 (defun scan-char (instance state &key (echo t))
   (with-slots (input-stream output-stream column) state
@@ -204,9 +202,9 @@
       (otherwise ; Either the sharpsign not followed by anything or we don't know what it is.
         '(:form)))))
 
-(defun scan-chunk (instance state)
+(defun scan-chunk (instance state &optional completed-form-count template)
   (with-slots (output-stream) state
-    (let ((ch (scan-char instance state :echo nil)))
+    (when-let ((ch (scan-char instance state :echo nil)))
       (case ch
         (#\Newline
           (write-char ch (output-stream state))
@@ -228,7 +226,11 @@
           (scan-form instance state))
         ((#\( #\[)
           (write-char ch (output-stream state))
-          (scan-forms instance state))
+          (scan-forms instance state
+            (when template
+              (if (> completed-form-count (car template))
+                (caddr template)
+                (cadr template)))))
         ((#\) #\])
           (write-char ch (output-stream state))
           '(:exit))
@@ -243,22 +245,22 @@
       (unless (eql (car chunk) :space)
         (return chunk)))))
 
-(defun scan-forms (instance state)
+(defun scan-forms (instance state &optional template)
   (with-slots (column output-stream) state
     (do* ((indent column)
           (primary-indent (+ 3 indent))
           (secondary-indent (1+ indent))
-          (primary-form-count nil)
           (completed-form-count 0)
           (previous-column column column)
-          (form (scan-chunk instance state) (scan-chunk instance state)))
+          (form (scan-chunk instance state completed-form-count template)
+                (scan-chunk instance state completed-form-count template)))
          ((not form))
       (case (car form)
         (:indent
           (setf column
             (cond
-              ((not primary-form-count) indent)
-              ((> completed-form-count primary-form-count)
+              ((not template) indent)
+              ((> completed-form-count (car template))
                 secondary-indent)
               (t primary-indent)))
           (dotimes (k column)
@@ -266,11 +268,11 @@
         (:form
           (incf completed-form-count)
           (cond
-            ((and (= 1 completed-form-count) (cadr form))
-              (setf primary-form-count (indent-number instance (cadr form))))
-            ((and primary-form-count (= 1 completed-form-count))
+            ((and (not template) (= 1 completed-form-count) (cadr form))
+              (setf template (indent-template instance (cadr form))))
+            ((and template (= 1 completed-form-count))
               (setf primary-indent previous-column))
-            ((and primary-form-count (= (+ 2 primary-form-count) completed-form-count))
+            ((and template (= (+ 2 (car template)) completed-form-count))
               (setf secondary-indent previous-column))))
         (:exit
           (return '(:form)))))))
