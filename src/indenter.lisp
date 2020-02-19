@@ -143,10 +143,16 @@
   '(:form))
 
 (defun scan-sharpsign (instance state)
-  (let ((ch (scan-char instance state)))
+  (do ((ch (scan-char instance state) (scan-char instance state)))
+      ((not ch))
     (case ch
+      ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
       (#\\
-        (scan-sharpsign-backslash instance state))
+        (return (scan-sharpsign-backslash instance state)))
+      (#\'
+        (return (scan-form instance state)))
+      (#\(
+        (return (scan-forms instance state)))
       (otherwise
         '(:form)))))
 

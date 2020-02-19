@@ -3,7 +3,9 @@
        (quux
          bar)
        '(1 2
-         4)))
+         4))
+  (apply #'quux
+         1 2 '(a b)))
 
 (case ; Oddly placed comment
     fu
