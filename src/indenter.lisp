@@ -142,6 +142,38 @@
         (write-char ch (output-stream state)))))
   '(:form))
 
+(defun scan-sharpsign-asterisk (instance state)
+  (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
+      ((not ch))
+    (case ch
+      ((#\0 #\1))
+      (otherwise
+        (unscan-char instance state ch)
+        (return))))
+  '(:form))
+
+(defun scan-sharpsign-rational (instance state digits)
+  (do ((chars (concatenate 'string "/." digits))
+       (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
+      ((not ch))
+    (unless (find ch chars :test #'char-equal)
+      (unscan-char instance state ch)
+      (return)))
+  '(:form))
+
+(defun scan-sharpsign-vertical-bar (instance state)
+  (do* ((prev-ch nil ch)
+        (ch (scan-char instance state) (scan-char instance state))
+        (count 1))
+       ((not ch))
+    (cond
+      ((not prev-ch))
+      ((and (char= prev-ch #\#) (char= ch #\|))
+        (incf count))
+      ((and (char= prev-ch #\|) (char= ch #\#))
+        (when (zerop (decf count))
+          (return '(:space)))))))
+
 (defun scan-sharpsign (instance state)
   (do ((ch (scan-char instance state) (scan-char instance state)))
       ((not ch))
@@ -153,7 +185,23 @@
         (return (scan-form instance state)))
       (#\(
         (return (scan-forms instance state)))
-      (otherwise
+      (#\*
+        (return (scan-sharpsign-asterisk instance state)))
+      (#\:
+        (return (scan-token instance state)))
+      ((#\. #\c #\C #\a #\A #\s #\S #\p #\P #\n #\N #\+ #\-)
+        (return (scan-form instance state)))
+      ((#\b #\B)
+        (return (scan-sharpsign-rational instance state "01")))
+      ((#\o #\O)
+        (return (scan-sharpsign-rational instance state "01234567")))
+      ((#\x #\X)
+        (return (scan-sharpsign-rational instance state "0123456789abcdef")))
+      ((#\r #\R)
+        (return (scan-sharpsign-rational instance state "0123456789abcdefghijklmnopqrstuvwxyz")))
+      (#\|
+        (return (scan-sharpsign-vertical-bar instance state)))
+      (otherwise ; Either the sharpsign not followed by anything or we don't know what it is.
         '(:form)))))
 
 (defun scan-chunk (instance state)

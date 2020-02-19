@@ -29,3 +29,7 @@
 
 (if a b
       c)
+
+(defun #| block comment |#
+bar (x)
+(1+ x))
