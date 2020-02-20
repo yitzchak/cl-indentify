@@ -210,7 +210,7 @@
       (#\|
         (return (scan-sharpsign-vertical-bar instance state quoted)))
       (otherwise ; Either the sharpsign not followed by anything or we don't know what it is.
-        '(:form)))))
+        (return '(:form))))))
 
 (defun scan-chunk (instance state quoted &optional completed-form-count template)
   (with-slots (output-stream) state
