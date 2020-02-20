@@ -20,12 +20,10 @@
      :accessor column
      :initform 0)))
 
-(defun literal-token-p (s)
-  (let ((colon-pos (position #\: s)))
-    (if colon-pos
-      (= colon-pos 0)
-      (let ((s (read-from-string s)))
-        (or (characterp s) (numberp s) (stringp s))))))
+(defun number-token-p (token)
+  (handler-case (numberp (read-from-string token nil))
+    (reader-error ()
+      nil)))
 
 (defun keyword-token-p (s)
   (and (stringp s)
@@ -36,7 +34,7 @@
     (subseq name (1+ pos))))
 
 (defun indent-template (instance name)
-  (unless (literal-token-p name)
+  (unless (number-token-p name)
     (with-slots (indent-templates) instance
       (let ((normalized-name (uiop:standard-case-symbol-name name)))
         (or (gethash normalized-name indent-templates)
