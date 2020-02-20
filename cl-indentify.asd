@@ -4,7 +4,7 @@
   :author "Tarn W. Burton"
   :license "MIT"
   :depends-on
-    (#:alexandria #:uiop)
+    (#:alexandria #:uiop #:command-line-arguments)
   :components
     ((:module src
       :serial t

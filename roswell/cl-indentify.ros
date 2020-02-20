@@ -9,17 +9,54 @@ exec ros -Q -- $0 "$@"
   )
 
 (defpackage :ros.script.cl-indentify.3790531050
-  (:use :cl))
+            (:use :cl))
 (in-package :ros.script.cl-indentify.3790531050)
 
-(defun main (&optional in &rest argv)
-  (declare (ignorable argv))
+(defparameter +command-line-spec+
+  '((("outfile" #\o) :type string :optional t :documentation "Write output to file (default stdout)")
+    (("replace" #\r) :type boolean :optional t :documentation "Write output in-place, replacing input")
+    (("help" #\h #\?) :type boolean :optional t :documentation "Print this message and exit.")
+    (("version" #\V) :type boolean :optional t :documentation "Print the version and exit.")))
+
+(defun main-handler (files &key outfile help version replace)
   (let ((i (make-instance 'cl-indentify:indenter)))
     (cl-indentify:load-default-indents i)
     (cl-indentify:load-user-indents i)
-    (if in
-      (with-open-file (*standard-input* in)
-        (cl-indentify:indentify i))
-      (cl-indentify:indentify i))))
+    (cond
+      (help
+        (write-line "cl-indentify [OPTION]... [FILE]...")
+        (command-line-arguments:show-option-help +command-line-spec+ :sort-names t))
+      (version
+        (write-line "0.1"))
+      ((and replace files)
+        (dolist (file files)
+          (let ((result
+                  (with-output-to-string (output-stream)
+                    (with-open-file (input-stream file)
+                      (cl-indentify:indentify i input-stream output-stream)))))
+            (with-open-file (output-stream file :direction :output :if-exists :supersede)
+              (write-string result output-stream)))))
+      ((and outfile files)
+        (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
+          (dolist (file files)
+            (with-open-file (input-stream file)
+              (cl-indentify:indentify i input-stream output-stream)))))
+      (files
+        (dolist (file files)
+          (with-open-file (input-stream file)
+            (cl-indentify:indentify i input-stream))))
+      (outfile
+        (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
+          (cl-indentify:indentify i *standard-input* output-stream)))
+      (t
+        (cl-indentify:indentify i)))))
+
+(defun main (&rest args)
+  (command-line-arguments:handle-command-line
+    +command-line-spec+
+    #'main-handler
+    :command-line args
+    :name "cl-indentify"
+    :rest-arity t))
 
 ;;; vim: set ft=lisp lisp:
