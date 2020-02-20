@@ -27,6 +27,10 @@
       (let ((s (read-from-string s)))
         (or (characterp s) (numberp s) (stringp s))))))
 
+(defun keyword-token-p (s)
+  (and (stringp s)
+       (eql 0 (position #\: s))))
+
 (defun imported-symbol-name (name)
   (when-let ((pos (position #\: name)))
     (subseq name (1+ pos))))
@@ -239,7 +243,7 @@
           (write-char ch (output-stream state))
           (scan-forms instance state quoted
                       (when template
-                        (if (> completed-form-count (car template))
+                        (if (>= completed-form-count (car template))
                           (caddr template)
                           (cadr template)))))
         ((#\) #\])
@@ -261,7 +265,7 @@
     (do* ((indent column)
           (primary-indent (+ 3 indent))
           (secondary-indent (1+ indent))
-          (completed-form-count 0)
+          (completed-form-count -1)
           (previous-column column column)
           (form (scan-chunk instance state quoted completed-form-count template)
                 (scan-chunk instance state quoted completed-form-count template)))
@@ -271,7 +275,7 @@
           (setf column
             (cond
               ((not template) indent)
-              ((> completed-form-count (car template))
+              ((>= completed-form-count (car template))
                 secondary-indent)
               (t primary-indent)))
           (dotimes (k column)
@@ -279,12 +283,16 @@
         (:form
           (incf completed-form-count)
           (cond
-            ((and (not quoted) (not template) (= 1 completed-form-count) (cadr form))
+            ((and (not quoted) (not template) (zerop completed-form-count) (cadr form))
               (setf template (indent-template instance (cadr form))))
-            ((and template (not (zerop (car template))) (= 2 completed-form-count))
+            ((and template (not (zerop (car template))) (= 1 completed-form-count))
               (setf primary-indent previous-column))
-            ((and template (= (+ 2 (car template)) completed-form-count))
-              (setf secondary-indent previous-column))))
+            ((and template (= (1+ (car template)) completed-form-count))
+              (setf secondary-indent previous-column)))
+          (when (and template
+                     (keyword-token-p (cadr form))
+                     (<= completed-form-count (car template)))
+            (decf completed-form-count)))
         (:exit
           (return '(:form)))))))
 
@@ -293,5 +301,7 @@
                               :input-stream (or input-stream *standard-input*)
                               :output-stream (or output-stream *standard-output*))))
     (scan-indent instance state nil)
+    (dotimes (k (column state))
+      (write-char #\Space output-stream))
     (scan-forms instance state nil)))
 

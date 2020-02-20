@@ -40,7 +40,7 @@
     (eval-when 1)
     (flet 1)
     (handler-bind 0)
-    (handler-case 1)
+    (handler-case 1 nil (1))
     (if 1)
     (incf 1)
     (labels 1)

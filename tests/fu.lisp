@@ -65,4 +65,8 @@
   quux 1
   2 3)
 
+(defmethod stop ((hb hb-channel))
+  (bordeaux-threads:destroy-thread (hb-thread-id hb)))
 
+(defmethod stop :after ((hb hb-channel))
+  (wibble))
