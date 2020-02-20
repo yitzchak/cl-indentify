@@ -78,7 +78,8 @@
       (otherwise
         (decf column)))))
 
-(defun scan-string (instance state)
+(defun scan-string (instance state quoted)
+  (declare (ignore quoted))
   (scan-char instance state)
   (do ((ch (scan-char instance state) (scan-char instance state)))
       ((not ch))
@@ -88,7 +89,8 @@
       (#\"
         (return '(:form))))))
 
-(defun scan-indent (instance state)
+(defun scan-indent (instance state quoted)
+  (declare (ignore quoted))
   (with-slots (column output-stream) state
     (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
         ((not ch))
@@ -99,7 +101,8 @@
           (return)))))
   '(:indent))
 
-(defun scan-line-comment (instance state)
+(defun scan-line-comment (instance state quoted)
+  (declare (ignore quoted))
   (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
       ((not ch))
     (when (char= ch #\Newline)
@@ -108,7 +111,8 @@
     (write-char ch (output-stream state)))
   '(:space))
 
-(defun scan-token (instance state)
+(defun scan-token (instance state quoted)
+  (declare (ignore quoted))
   (list
     :form
     (with-output-to-string (token-stream)
@@ -122,7 +126,8 @@
             (write-char ch token-stream)
             (write-char ch (output-stream state))))))))
 
-(defun scan-sharpsign-backslash (instance state)
+(defun scan-sharpsign-backslash (instance state quoted)
+  (declare (ignore quoted))
   (do ((pos 0 (1+ pos))
        (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
       ((not ch))
@@ -140,7 +145,8 @@
         (write-char ch (output-stream state)))))
   '(:form))
 
-(defun scan-sharpsign-asterisk (instance state)
+(defun scan-sharpsign-asterisk (instance state quoted)
+  (declare (ignore quoted))
   (do ((ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
       ((not ch))
     (case ch
@@ -150,7 +156,8 @@
         (return))))
   '(:form))
 
-(defun scan-sharpsign-rational (instance state digits)
+(defun scan-sharpsign-rational (instance state quoted digits)
+  (declare (ignore quoted))
   (do ((chars (concatenate 'string "/." digits))
        (ch (scan-char instance state :echo nil) (scan-char instance state :echo nil)))
       ((not ch))
@@ -159,7 +166,8 @@
       (return)))
   '(:form))
 
-(defun scan-sharpsign-vertical-bar (instance state)
+(defun scan-sharpsign-vertical-bar (instance state quoted)
+  (declare (ignore quoted))
   (do* ((prev-ch nil ch)
         (ch (scan-char instance state) (scan-char instance state))
         (count 1))
@@ -172,88 +180,91 @@
         (when (zerop (decf count))
           (return '(:space)))))))
 
-(defun scan-sharpsign (instance state)
+(defun scan-sharpsign (instance state quoted)
   (do ((ch (scan-char instance state) (scan-char instance state)))
       ((not ch))
     (case ch
       ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
       (#\\
-        (return (scan-sharpsign-backslash instance state)))
+        (return (scan-sharpsign-backslash instance state quoted)))
       (#\'
-        (return (scan-form instance state)))
+        (return (scan-form instance state quoted)))
       (#\(
-        (return (scan-forms instance state)))
+        (return (scan-forms instance state quoted)))
       (#\*
-        (return (scan-sharpsign-asterisk instance state)))
+        (return (scan-sharpsign-asterisk instance state quoted)))
       (#\:
-        (return (scan-token instance state)))
+        (return (scan-token instance state quoted)))
       ((#\. #\c #\C #\a #\A #\s #\S #\p #\P #\n #\N #\+ #\-)
-        (return (scan-form instance state)))
+        (return (scan-form instance state quoted)))
       ((#\b #\B)
-        (return (scan-sharpsign-rational instance state "01")))
+        (return (scan-sharpsign-rational instance state quoted "01")))
       ((#\o #\O)
-        (return (scan-sharpsign-rational instance state "01234567")))
+        (return (scan-sharpsign-rational instance state quoted "01234567")))
       ((#\x #\X)
-        (return (scan-sharpsign-rational instance state "0123456789abcdef")))
+        (return (scan-sharpsign-rational instance state quoted "0123456789abcdef")))
       ((#\r #\R)
-        (return (scan-sharpsign-rational instance state "0123456789abcdefghijklmnopqrstuvwxyz")))
+        (return (scan-sharpsign-rational instance state quoted "0123456789abcdefghijklmnopqrstuvwxyz")))
       (#\|
-        (return (scan-sharpsign-vertical-bar instance state)))
+        (return (scan-sharpsign-vertical-bar instance state quoted)))
       (otherwise ; Either the sharpsign not followed by anything or we don't know what it is.
         '(:form)))))
 
-(defun scan-chunk (instance state &optional completed-form-count template)
+(defun scan-chunk (instance state quoted &optional completed-form-count template)
   (with-slots (output-stream) state
     (when-let ((ch (scan-char instance state :echo nil)))
       (case ch
         (#\Newline
           (write-char ch (output-stream state))
-          (scan-indent instance state))
+          (scan-indent instance state quoted))
         (#\"
           (write-char ch (output-stream state))
-          (scan-string instance state))
+          (scan-string instance state quoted))
         (#\;
           (write-char ch (output-stream state))
-          (scan-line-comment instance state))
+          (scan-line-comment instance state quoted))
         (#\#
           (write-char ch (output-stream state))
-          (scan-sharpsign instance state))
+          (scan-sharpsign instance state quoted))
         ((#\Space #\Tab)
           (write-char ch (output-stream state))
           '(:space))
-        ((#\' #\` #\@ #\,)
+        (#\'
           (write-char ch (output-stream state))
-          (scan-form instance state))
+          (scan-form instance state t))
+        ((#\` #\@ #\,)
+          (write-char ch (output-stream state))
+          (scan-form instance state quoted))
         ((#\( #\[)
           (write-char ch (output-stream state))
-          (scan-forms instance state
-            (when template
-              (if (> completed-form-count (car template))
-                (caddr template)
-                (cadr template)))))
+          (scan-forms instance state quoted
+                      (when template
+                        (if (> completed-form-count (car template))
+                          (caddr template)
+                          (cadr template)))))
         ((#\) #\])
           (write-char ch (output-stream state))
           '(:exit))
         (otherwise
           (unscan-char instance state ch)
-          (scan-token instance state))))))
+          (scan-token instance state quoted))))))
 
-(defun scan-form (instance state)
+(defun scan-form (instance state quoted)
   (with-slots (output-stream) state
-    (do ((chunk (scan-chunk instance state) (scan-chunk instance state)))
+    (do ((chunk (scan-chunk instance state quoted) (scan-chunk instance state quoted)))
         ((not chunk))
       (unless (eql (car chunk) :space)
         (return chunk)))))
 
-(defun scan-forms (instance state &optional template)
+(defun scan-forms (instance state quoted &optional template)
   (with-slots (column output-stream) state
     (do* ((indent column)
           (primary-indent (+ 3 indent))
           (secondary-indent (1+ indent))
           (completed-form-count 0)
           (previous-column column column)
-          (form (scan-chunk instance state completed-form-count template)
-                (scan-chunk instance state completed-form-count template)))
+          (form (scan-chunk instance state quoted completed-form-count template)
+                (scan-chunk instance state quoted completed-form-count template)))
          ((not form))
       (case (car form)
         (:indent
@@ -268,9 +279,9 @@
         (:form
           (incf completed-form-count)
           (cond
-            ((and (not template) (= 1 completed-form-count) (cadr form))
+            ((and (not quoted) (not template) (= 1 completed-form-count) (cadr form))
               (setf template (indent-template instance (cadr form))))
-            ((and template (= 1 completed-form-count))
+            ((and template (not (zerop (car template))) (= 2 completed-form-count))
               (setf primary-indent previous-column))
             ((and template (= (+ 2 (car template)) completed-form-count))
               (setf secondary-indent previous-column))))
@@ -281,6 +292,6 @@
   (let ((state (make-instance 'indenter-state
                               :input-stream (or input-stream *standard-input*)
                               :output-stream (or output-stream *standard-output*))))
-    (scan-indent instance state)
-    (scan-forms instance state)))
+    (scan-indent instance state nil)
+    (scan-forms instance state nil)))
 

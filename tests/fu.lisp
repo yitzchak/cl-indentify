@@ -7,6 +7,10 @@
   (apply #'quux
          1 2 '(a b)))
 
+(defun wibble
+       (bar zap)
+  (expt bar zap))
+
 (case ; Oddly placed comment
     fu
   (#\) nil)
@@ -44,3 +48,21 @@
      :initarg :wibble)
    (gronk :accessor gronk
           :initarg :gronk)))
+
+(let ((f 1)
+      (g 1))
+  (print f))
+
+(let* ((f 1)
+       (g 1))
+  (print f))
+
+(do* ((f 1 (1+ f)))
+     ((> f 4) 'bar)
+  (print f))
+
+'(wibble
+  quux 1
+  2 3)
+
+
