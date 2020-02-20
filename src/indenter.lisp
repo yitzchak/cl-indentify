@@ -41,7 +41,7 @@
       (let ((normalized-name (uiop:standard-case-symbol-name name)))
         (or (gethash normalized-name indent-templates)
             (gethash (imported-symbol-name name) indent-templates)
-            '(0))))))
+            '(:count 0))))))
 
 (defun (setf indent-template) (value instance name)
   (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance)) value))
@@ -243,9 +243,9 @@
           (write-char ch (output-stream state))
           (scan-forms instance state quoted
                       (when template
-                        (if (>= completed-form-count (car template))
-                          (caddr template)
-                          (cadr template)))))
+                        (if (< completed-form-count (getf template :count))
+                          (getf template :primary)
+                          (getf template :secondary)))))
         ((#\) #\])
           (write-char ch (output-stream state))
           '(:exit))
@@ -275,7 +275,7 @@
           (setf column
             (cond
               ((not template) indent)
-              ((>= completed-form-count (car template))
+              ((>= completed-form-count (getf template :count))
                 secondary-indent)
               (t primary-indent)))
           (dotimes (k column)
@@ -285,13 +285,13 @@
           (cond
             ((and (not quoted) (not template) (zerop completed-form-count) (cadr form))
               (setf template (indent-template instance (cadr form))))
-            ((and template (not (zerop (car template))) (= 1 completed-form-count))
+            ((and template (not (zerop (getf template :count))) (= 1 completed-form-count))
               (setf primary-indent previous-column))
-            ((and template (= (1+ (car template)) completed-form-count))
+            ((and template (= (1+ (getf template :count)) completed-form-count))
               (setf secondary-indent previous-column)))
           (when (and template
                      (keyword-token-p (cadr form))
-                     (<= completed-form-count (car template)))
+                     (<= completed-form-count (getf template :count)))
             (decf completed-form-count)))
         (:exit
           (return '(:form)))))))
