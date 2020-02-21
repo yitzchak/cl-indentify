@@ -33,6 +33,11 @@
   (when-let ((pos (position #\: name)))
     (subseq name (1+ pos))))
 
+(defun normalize-symbol (sym)
+  (if (stringp sym)
+    (uiop:standard-case-symbol-name sym)
+    (format nil "~S" sym)))
+
 (defun indent-template (instance name)
   (unless (number-token-p name)
     (with-slots (indent-templates) instance
@@ -42,7 +47,7 @@
             '(:count 0))))))
 
 (defun (setf indent-template) (value instance name)
-  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance)) value))
+  (setf (gethash (normalize-symbol name) (indent-templates instance)) value))
 
 (defun load-default-indents (instance)
   (dolist (p +default-indent-templates+)
@@ -288,7 +293,9 @@
             ((and template (= (1+ (getf template :count)) completed-form-count))
               (setf secondary-indent previous-column)))
           (when (and template
-                     (keyword-token-p (cadr form))
+                     (member (cadr form) (getf template :ignore)
+                             :test (lambda (x y)
+                                     (string= (normalize-symbol x) (normalize-symbol y))))
                      (<= completed-form-count (getf template :count)))
             (decf completed-form-count)))
         (:exit

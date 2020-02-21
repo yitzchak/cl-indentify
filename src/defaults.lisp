@@ -19,7 +19,7 @@
     (define-setf-expander :count 2)
     (define-symbol-macro :count 2)
     (defmacro :count 2)
-    (defmethod :count 2)
+    (defmethod :count 2 :ignore (:before :after :around))
     (defpackage :count 1 :secondary (:count 0))
     (defparameter :count 1)
     (defsetf :count 2)
