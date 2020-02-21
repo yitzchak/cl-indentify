@@ -15,16 +15,24 @@ exec ros -Q -- $0 "$@"
 (defparameter +command-line-spec+
   '((("outfile" #\o) :type string :optional t :documentation "Write output to file (default stdout)")
     (("replace" #\r) :type boolean :optional t :documentation "Write output in-place, replacing input")
+    (("no-defaults") :type boolean :optional t :documentation "Do not load default templates.")
+    (("no-user") :type boolean :optional t :documentation "Do not load user templates.")
+    (("templates" #\t) :type string :optional t :documentation "Load template file")
     (("help" #\h #\?) :type boolean :optional t :documentation "Print this message and exit.")
     (("version" #\V) :type boolean :optional t :documentation "Print the version and exit.")))
 
-(defun main-handler (files &key outfile help version replace)
+(defun main-handler (files &key outfile help version replace no-defaults no-user templates)
   (let ((i (make-instance 'cl-indentify:indenter)))
-    (cl-indentify:load-default-indents i)
-    (cl-indentify:load-user-indents i)
+    (unless no-defaults
+      (cl-indentify:load-default-templates i))
+    (when templates
+      (cl-indentify:load-template-file i templates))
+    (unless no-user
+      (cl-indentify:load-user-templates i))
     (cond
       (help
         (write-line "cl-indentify [OPTION]... [FILE]...")
+        (write-line "If no files are given then input is read from stdin.")
         (command-line-arguments:show-option-help +command-line-spec+ :sort-names t))
       (version
         (write-line "0.1"))

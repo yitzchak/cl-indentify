@@ -1,10 +1,14 @@
 (defpackage #:cl-indentify
-  (:use #:alexandria #:cl)
+  (:use :cl)
+  (:import-from :alexandria
+    :when-let
+    :with-gensyms)
   (:export
-    #:load-default-indents
-    #:load-user-indents
     #:indenter
     #:indentify
-    #:indent-template))
+    #:indent-template
+    #:load-default-templates
+    #:load-template-file
+    #:load-user-templates))
 
 

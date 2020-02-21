@@ -70,3 +70,4 @@
 
 (defmethod stop :after ((hb hb-channel))
   (wibble))
+

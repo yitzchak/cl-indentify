@@ -49,16 +49,19 @@
 (defun (setf indent-template) (value instance name)
   (setf (gethash (normalize-symbol name) (indent-templates instance)) value))
 
-(defun load-default-indents (instance)
+(defun load-default-templates (instance)
   (dolist (p +default-indent-templates+)
     (setf (indent-template instance (car p)) (cdr p))))
 
-(defun load-user-indents (instance)
-  (with-open-file (indents-stream (uiop:xdg-config-home "cl-indentify" "indents.lisp") :if-does-not-exist nil)
+(defun load-template-file (instance path)
+  (with-open-file (indents-stream path :if-does-not-exist nil)
     (when indents-stream
       (do ((q (read indents-stream nil) (read indents-stream nil)))
           ((not q))
         (setf (indent-template instance (car q)) (cdr q))))))
+
+(defun load-user-templates (instance)
+  (load-template-file instance (uiop:xdg-config-home "cl-indentify" "templates.lisp")))
 
 (defun scan-char (instance state &key (echo t))
   (with-slots (input-stream output-stream column) state
