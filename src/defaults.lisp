@@ -1,8 +1,7 @@
 (in-package :cl-indentify)
 
-(defparameter +default-indent-templates+
+(defparameter +common-lisp-templates+
   '((assert :count 2)
-    (asdf:defsystem :count 1)
     (block :count 0)
     (case :count 1 :secondary (:count 0))
     (ccase :count 1 :secondary (:count 0))
@@ -66,4 +65,40 @@
     (with-output-to-string :count 1)
     (with-slots :count 2)))
 
+(defparameter +asdf-templates+
+  '((asdf:defsystem :count 1)))
+
+(defparameter +uiop-templates+
+  '((uiop:while-collecting :count 1)
+    (uiop:with-current-directory :count 1)
+    (uiop:with-deprecation :count 1)
+    (uiop:with-enough-pathname :count 1)
+    (uiop:with-fatal-condition-handler :count 1)
+    (uiop:with-input :count 1)
+    (uiop:with-muffled-compiler-conditions :count 1)
+    (uiop:with-muffled-conditions :count 1)
+    (uiop:with-muffled-loader-conditions :count 1)
+    (uiop:with-null-input :count 1)
+    (uiop:with-null-output :count 1)
+    (uiop:with-output :count 1)
+    (uiop:with-safe-io-syntax :count 1)
+    (uiop:with-saved-deferred-warnings :count 1)
+    (uiop:with-staging-pathname :count 1)
+    (uiop:with-temporary-file :count 1)
+    (uiop:with-upgradability :count 1)))
+
+(defparameter +alexandria-templates+
+  '((alexandria:cswitch :count 1 :secondary (:count 0))
+    (alexandria:destructuring-case :count 1 :secondary (:count 0))
+    (alexandria:destructuring-ccase :count 1 :secondary (:count 0))
+    (alexandria:destructuring-ecase :count 1 :secondary (:count 0))
+    (alexandria:eswitch :count 1 :secondary (:count 0))
+    (alexandria:if-let :count 1)
+    (alexandria:named-lambda :count 2)
+    (alexandria:once-only :count 1)
+    (alexandria:switch :count 1 :secondary (:count 0))
+    (alexandria:when-let :count 1)
+    (alexandria:when-let* :count 1)
+    (alexandria:with-gensyms :count 1)
+    (alexandria:with-unique-names :count 1)))
 

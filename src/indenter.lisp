@@ -25,33 +25,65 @@
     (reader-error ()
       nil)))
 
-(defun keyword-token-p (s)
-  (and (stringp s)
-       (eql 0 (position #\: s))))
-
-(defun imported-symbol-name (name)
-  (when-let ((pos (position #\: name)))
-    (subseq name (1+ pos))))
-
-(defun normalize-symbol (sym)
-  (if (stringp sym)
-    (uiop:standard-case-symbol-name sym)
-    (format nil "~S" sym)))
-
 (defun indent-template (instance name)
   (unless (number-token-p name)
-    (with-slots (indent-templates) instance
-      (let ((normalized-name (uiop:standard-case-symbol-name name)))
-        (or (gethash normalized-name indent-templates)
-            (gethash (imported-symbol-name name) indent-templates)
-            '(:count 0))))))
+    (gethash (uiop:standard-case-symbol-name name)
+             (indent-templates instance)
+             '(:count 0))))
 
-(defun (setf indent-template) (value instance name)
-  (setf (gethash (normalize-symbol name) (indent-templates instance)) value))
+(defgeneric (setf indent-template) (value instance name))
+
+(defmethod (setf indent-template) (value instance (name string))
+  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance)) value))
+
+(defun write-symbol-to-string (package-name symbol-name)
+  (format nil "~A:~A" package-name symbol-name))
+
+(defun symbol-names (sym)
+  (if (keywordp sym)
+    (list (prin1-to-string sym))
+    (let ((pkg (symbol-package sym))
+          (name (symbol-name sym)))
+      (remove-duplicates
+        (list*
+          (prin1-to-string sym)
+          name
+          (write-symbol-to-string (package-name pkg) name)
+          (mapcar
+            (lambda (nickname)
+              (write-symbol-to-string nickname name))
+            (package-nicknames (symbol-package sym))))
+        :test #'string=))))
+
+(defun normalize-template (template)
+  (let ((new-template (list :count (getf template :count 0))))
+    (when-let ((ig (getf template :ignore)))
+      (setf (getf new-template :ignore)
+        (mapcan #'symbol-names ig)))
+    (when-let ((primary (getf template :primary)))
+      (setf (getf new-template :primary)
+        (normalize-template primary)))
+    (when-let ((secondary (getf template :secondary)))
+      (setf (getf new-template :secondary)
+        (normalize-template secondary)))
+    new-template))
+
+(defmethod (setf indent-template) (value instance (sym symbol))
+  (with-slots (indent-templates) instance
+    (dolist (name (symbol-names sym))
+      (setf (gethash name indent-templates) value))))
+
+(defun load-templates (instance &rest template-groups)
+  (dolist (templates template-groups)
+    (dolist (p templates)
+      (setf (indent-template instance (car p)) (normalize-template (cdr p))))))
 
 (defun load-default-templates (instance)
-  (dolist (p +default-indent-templates+)
-    (setf (indent-template instance (car p)) (cdr p))))
+  (load-templates instance
+                  +common-lisp-templates+
+                  +asdf-templates+
+                  +uiop-templates+
+                  +alexandria-templates+))
 
 (defun load-template-file (instance path)
   (with-open-file (indents-stream path :if-does-not-exist nil)
@@ -296,9 +328,8 @@
             ((and template (= (1+ (getf template :count)) completed-form-count))
               (setf secondary-indent previous-column)))
           (when (and template
-                     (member (cadr form) (getf template :ignore)
-                             :test (lambda (x y)
-                                     (string= (normalize-symbol x) (normalize-symbol y))))
+                     (member (uiop:standard-case-symbol-name (cadr form)) (getf template :ignore)
+                             :test #'string=)
                      (<= completed-form-count (getf template :count)))
             (decf completed-form-count)))
         (:exit
