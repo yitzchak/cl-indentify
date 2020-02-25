@@ -34,10 +34,14 @@
 (defgeneric (setf indent-template) (value instance name))
 
 (defmethod (setf indent-template) (value instance (name string))
-  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance)) value))
+  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance))
+    (normalize-template value)))
 
-(defun write-symbol-to-string (package-name symbol-name)
-  (format nil "~A:~A" package-name symbol-name))
+(defun write-symbol-to-string (package-name symbol-name &key (exported t))
+  (concatenate 'string
+               package-name
+               (if exported ":" "::")
+               symbol-name))
 
 (defun symbol-names (sym)
   (if (keywordp sym)
@@ -70,13 +74,14 @@
 
 (defmethod (setf indent-template) (value instance (sym symbol))
   (with-slots (indent-templates) instance
-    (dolist (name (symbol-names sym))
-      (setf (gethash name indent-templates) value))))
+    (let ((normalized-template (normalize-template value)))
+      (dolist (name (symbol-names sym))
+        (setf (gethash name indent-templates) normalized-template)))))
 
 (defun load-templates (instance &rest template-groups)
   (dolist (templates template-groups)
     (dolist (p templates)
-      (setf (indent-template instance (car p)) (normalize-template (cdr p))))))
+      (setf (indent-template instance (car p)) (cdr p)))))
 
 (defun load-default-templates (instance)
   (load-templates instance
