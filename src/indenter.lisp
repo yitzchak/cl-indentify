@@ -46,18 +46,22 @@
 (defun symbol-names (sym)
   (if (keywordp sym)
     (list (prin1-to-string sym))
-    (let ((pkg (symbol-package sym))
-          (name (symbol-name sym)))
-      (remove-duplicates
-        (list*
-          (prin1-to-string sym)
-          name
-          (write-symbol-to-string (package-name pkg) name)
-          (mapcar
-            (lambda (nickname)
-              (write-symbol-to-string nickname name))
-            (package-nicknames (symbol-package sym))))
-        :test #'string=))))
+    (remove-duplicates
+      (let ((name (symbol-name sym)))
+        (mapcan
+          (lambda (pkg)
+            (multiple-value-bind (other-sym status) (find-symbol name pkg)
+              (when (and (eql status :external) (eql other-sym sym))
+                (list*
+                  (prin1-to-string sym)
+                  name
+                  (write-symbol-to-string (package-name pkg) name)
+                  (mapcar
+                    (lambda (nickname)
+                      (write-symbol-to-string nickname name))
+                    (package-nicknames pkg))))))
+          (list-all-packages)))
+      :test #'string=)))
 
 (defun normalize-template (template)
   (let ((new-template (list :count (getf template :count 0))))
