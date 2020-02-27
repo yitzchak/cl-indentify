@@ -1,6 +1,6 @@
 (in-package :cl-indentify)
 
-(defclass transform-stream (trivial-gray-streams:fundamental-character-output-stream
+(defclass synchronized-stream (trivial-gray-streams:fundamental-character-output-stream
                             trivial-gray-streams:fundamental-character-input-stream)
   ((input-stream
      :accessor input-stream
@@ -17,16 +17,16 @@
      :initarg :echo
      :initform t)))
 
-(defmethod trivial-gray-streams:stream-write-char ((stream transform-stream) char)
+(defmethod trivial-gray-streams:stream-write-char ((stream synchronized-stream) char)
   (write-char char (output-stream stream)))
 
-(defmethod trivial-gray-streams:stream-finish-output ((stream transform-stream))
+(defmethod trivial-gray-streams:stream-finish-output ((stream synchronized-stream))
   (finish-output (output-stream stream)))
 
-(defmethod trivial-gray-streams:stream-listen ((stream transform-stream))
+(defmethod trivial-gray-streams:stream-listen ((stream synchronized-stream))
   (listen (input-stream stream)))
 
-(defmethod trivial-gray-streams:stream-read-char ((stream transform-stream))
+(defmethod trivial-gray-streams:stream-read-char ((stream synchronized-stream))
   (with-slots (input-stream output-stream column echo) stream
     (or
       (when-let ((ch (read-char input-stream nil)))
@@ -43,11 +43,19 @@
         ch)
       :eof)))
 
-(defmethod trivial-gray-streams:stream-peek-char ((stream transform-stream))
+(defmethod trivial-gray-streams:stream-peek-char ((stream synchronized-stream))
   (peek-char nil (input-stream stream) nil :eof))
 
-(defmethod trivial-gray-streams:stream-unread-char ((stream transform-stream) char)
+(defmethod trivial-gray-streams:stream-unread-char ((stream synchronized-stream) char)
   (unread-char (input-stream stream) char))
 
-(defmethod trivial-gray-streams:stream-line-column ((stream transform-stream))
+(defmethod trivial-gray-streams:stream-line-column ((stream synchronized-stream))
   (column stream))
+
+(defmacro without-echo (stream &body body)
+  `(with-slots (echo) ,stream
+     (unwind-protect
+         (progn
+           (setf echo nil)
+           ,@body)
+       (setf echo t))))

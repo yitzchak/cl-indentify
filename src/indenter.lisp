@@ -97,14 +97,13 @@
 
 (defun scan-indent (stream &optional template)
   (declare (ignore template))
-  (setf (echo stream) nil)
-  (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
-      ((or (not ch)
-           (and (char/= ch #\Space)
-                (char/= ch #\Tab))))
-    (read-char stream nil))
-  (setf (echo stream) t)
-  '(:indent))
+  (without-echo stream
+    (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
+        ((or (not ch)
+             (and (char/= ch #\Space)
+                  (char/= ch #\Tab)))
+                  '(:indent))
+      (read-char stream nil))))
 
 (defun scan-line-comment (stream &optional template)
   (declare (ignore template))
@@ -297,7 +296,7 @@
           (return '(:form)))))))
 
 (defun indentify (&optional input-stream output-stream)
-  (let ((stream (make-instance 'transform-stream
+  (let ((stream (make-instance 'synchronized-stream
                                :input-stream (or input-stream *standard-input*)
                                :output-stream (or output-stream *standard-output*))))
     (scan-indent stream)
