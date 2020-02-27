@@ -22,42 +22,41 @@ exec ros -Q -- $0 "$@"
     (("version" #\V) :type boolean :optional t :documentation "Print the version and exit.")))
 
 (defun main-handler (files &key outfile help version replace no-defaults no-user templates)
-  (let ((i (make-instance 'cl-indentify:indenter)))
-    (unless no-defaults
-      (cl-indentify:load-default-templates i))
-    (when templates
-      (cl-indentify:load-template-file i templates))
-    (unless no-user
-      (cl-indentify:load-user-templates i))
-    (cond
-      (help
-        (write-line "cl-indentify [OPTION]... [FILE]...")
-        (write-line "If no files are given then input is read from stdin.")
-        (command-line-arguments:show-option-help +command-line-spec+ :sort-names t))
-      (version
-        (write-line "0.1"))
-      ((and replace files)
-        (dolist (file files)
-          (let ((result
-                  (with-output-to-string (output-stream)
-                    (with-open-file (input-stream file)
-                      (cl-indentify:indentify i input-stream output-stream)))))
-            (with-open-file (output-stream file :direction :output :if-exists :supersede)
-              (write-string result output-stream)))))
-      ((and outfile files)
-        (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
-          (dolist (file files)
-            (with-open-file (input-stream file)
-              (cl-indentify:indentify i input-stream output-stream)))))
-      (files
+  (unless no-defaults
+    (cl-indentify:load-default-templates))
+  (when templates
+    (cl-indentify:load-template-file templates))
+  (unless no-user
+    (cl-indentify:load-user-templates))
+  (cond
+    (help
+      (write-line "cl-indentify [OPTION]... [FILE]...")
+      (write-line "If no files are given then input is read from stdin.")
+      (command-line-arguments:show-option-help +command-line-spec+ :sort-names t))
+    (version
+      (write-line "0.1"))
+    ((and replace files)
+      (dolist (file files)
+        (let ((result
+                (with-output-to-string (output-stream)
+                  (with-open-file (input-stream file)
+                    (cl-indentify:indentify input-stream output-stream)))))
+          (with-open-file (output-stream file :direction :output :if-exists :supersede)
+            (write-string result output-stream)))))
+    ((and outfile files)
+      (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
         (dolist (file files)
           (with-open-file (input-stream file)
-            (cl-indentify:indentify i input-stream))))
-      (outfile
-        (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
-          (cl-indentify:indentify i *standard-input* output-stream)))
-      (t
-        (cl-indentify:indentify i)))))
+            (cl-indentify:indentify input-stream output-stream)))))
+    (files
+      (dolist (file files)
+        (with-open-file (input-stream file)
+          (cl-indentify:indentify input-stream))))
+    (outfile
+      (with-open-file (output-stream outfile :direction :output :if-exists :supersede)
+        (cl-indentify:indentify *standard-input* output-stream)))
+    (t
+      (cl-indentify:indentify))))
 
 (defun main (&rest args)
   (command-line-arguments:handle-command-line

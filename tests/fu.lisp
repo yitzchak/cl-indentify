@@ -71,3 +71,14 @@
 (defmethod stop :after ((hb hb-channel))
   (wibble))
 
+(defun scan-indent (stream &optional template)
+  (declare (ignore template))
+  (setf (echo stream) nil)
+  (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
+      ((or (not ch)
+           (and (char/= ch #\Space)
+                (char/= ch #\Tab))))
+    (read-char stream nil))
+  (setf (echo stream) t)
+  '(:indent))
+
