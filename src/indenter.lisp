@@ -186,7 +186,7 @@
     (case ch
       ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
       (#\\
-        (scan-sharpsign-backslash stream template))
+        (return (scan-sharpsign-backslash stream template)))
       (#\'
         (return (scan-form stream template)))
       (#\(
@@ -255,6 +255,10 @@
     (t
       (getf template :secondary))))
 
+(defun write-indent (stream)
+  (dotimes (k (column stream))
+    (write-char #\Space stream)))
+
 (defun scan-forms (stream &optional template)
   (with-slots (column) stream
     (do* ((indent column)
@@ -274,8 +278,7 @@
               ((>= completed-form-count (getf template :count 0))
                 secondary-indent)
               (t primary-indent)))
-          (dotimes (k column)
-            (write-char #\Space stream)))
+          (write-indent stream))
         (:form
           (incf completed-form-count)
           (cond
@@ -298,7 +301,6 @@
                                :input-stream (or input-stream *standard-input*)
                                :output-stream (or output-stream *standard-output*))))
     (scan-indent stream)
-    (dotimes (k (column stream))
-      (write-char #\Space stream))
+    (write-indent stream)
     (scan-forms stream)))
 
