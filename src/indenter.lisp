@@ -1,29 +1,22 @@
 (in-package :cl-indentify)
 
-(defclass indenter ()
-  ((indent-templates
-     :reader indent-templates
-     :initform (make-hash-table :test 'equalp))
-   (tab-size
-     :accessor tab-size
-     :initform 8
-     :initarg :tab-size)))
+(defparameter *indent-templates* (make-hash-table :test 'equalp))
 
 (defun number-token-p (token)
   (handler-case (numberp (read-from-string token nil))
     (reader-error ()
       nil)))
 
-(defun indent-template (instance name)
+(defun indent-template (name)
   (unless (number-token-p name)
     (gethash (uiop:standard-case-symbol-name name)
-             (indent-templates instance)
+             *indent-templates*
              '(:count 0))))
 
-(defgeneric (setf indent-template) (value instance name))
+(defgeneric (setf indent-template) (value name))
 
-(defmethod (setf indent-template) (value instance (name string))
-  (setf (gethash (uiop:standard-case-symbol-name name) (indent-templates instance))
+(defmethod (setf indent-template) (value (name string))
+  (setf (gethash (uiop:standard-case-symbol-name name) *indent-templates*)
     (normalize-template value)))
 
 (defun write-symbol-to-string (package-name symbol-name &key (exported t))
@@ -65,36 +58,34 @@
         (normalize-template secondary)))
     new-template))
 
-(defmethod (setf indent-template) (value instance (sym symbol))
-  (with-slots (indent-templates) instance
-    (let ((normalized-template (normalize-template value)))
-      (dolist (name (symbol-names sym))
-        (setf (gethash name indent-templates) normalized-template)))))
+(defmethod (setf indent-template) (value (sym symbol))
+  (let ((normalized-template (normalize-template value)))
+    (dolist (name (symbol-names sym))
+      (setf (gethash name *indent-templates*) normalized-template))))
 
-(defun load-templates (instance &rest template-groups)
+(defun load-templates (&rest template-groups)
   (dolist (templates template-groups)
     (dolist (p templates)
-      (setf (indent-template instance (car p)) (cdr p)))))
+      (setf (indent-template (car p)) (cdr p)))))
 
-(defun load-default-templates (instance)
-  (load-templates instance
-                  +common-lisp-templates+
+(defun load-default-templates ()
+  (load-templates +common-lisp-templates+
                   +asdf-templates+
                   +uiop-templates+
                   +alexandria-templates+))
 
-(defun load-template-file (instance path)
+(defun load-template-file (path)
   (with-open-file (indents-stream path :if-does-not-exist nil)
     (when indents-stream
       (do ((q (read indents-stream nil) (read indents-stream nil)))
           ((not q))
-        (setf (indent-template instance (car q)) (cdr q))))))
+        (setf (indent-template (car q)) (cdr q))))))
 
-(defun load-user-templates (instance)
-  (load-template-file instance (uiop:xdg-config-home "cl-indentify" "templates.lisp")))
+(defun load-user-templates ()
+  (load-template-file (uiop:xdg-config-home "cl-indentify" "templates.lisp")))
 
-(defun scan-string (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-string (stream &optional template)
+  (declare (ignore template))
   (read-char stream nil)
   (do ((ch (read-char stream nil) (read-char stream nil)))
       ((not ch))
@@ -104,8 +95,8 @@
       (#\"
         (return '(:form))))))
 
-(defun scan-indent (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-indent (stream &optional template)
+  (declare (ignore template))
   (setf (echo stream) nil)
   (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
       ((or (not ch)
@@ -115,16 +106,16 @@
   (setf (echo stream) t)
   '(:indent))
 
-(defun scan-line-comment (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-line-comment (stream &optional template)
+  (declare (ignore template))
   (read-char stream nil)
   (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
       ((or (not ch) (char= ch #\Newline)))
     (read-char stream nil))
   '(:space))
 
-(defun scan-token (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-token (stream &optional template)
+  (declare (ignore template))
   (list
     :form
     (with-output-to-string (token-stream)
@@ -137,8 +128,8 @@
             (read-char stream nil)
             (write-char ch token-stream)))))))
 
-(defun scan-sharpsign-backslash (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-sharpsign-backslash (stream &optional template)
+  (declare (ignore template))
   (do ((pos 0 (1+ pos))
        (ch (peek-char nil stream nil) (peek-char nil stream nil)))
       ((not ch))
@@ -153,8 +144,8 @@
         (read-char stream nil))))
   '(:form))
 
-(defun scan-sharpsign-asterisk (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-sharpsign-asterisk (stream &optional template)
+  (declare (ignore template))
   (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
       ((not ch))
     (case ch
@@ -164,8 +155,8 @@
         (return))))
   '(:form))
 
-(defun scan-sharpsign-rational (instance stream quoted digits)
-  (declare (ignore instance quoted))
+(defun scan-sharpsign-rational (digits stream &optional template)
+  (declare (ignore template))
   (do ((chars (concatenate 'string "/." digits))
        (ch (peek-char nil stream nil) (peek-char nil stream nil)))
       ((not ch))
@@ -174,8 +165,8 @@
       (return)))
   '(:form))
 
-(defun scan-sharpsign-vertical-bar (instance stream quoted)
-  (declare (ignore instance quoted))
+(defun scan-sharpsign-vertical-bar (stream &optional template)
+  (declare (ignore template))
   (do* ((prev-ch nil ch)
         (ch (read-char stream nil) (read-char stream nil))
         (count 1))
@@ -188,93 +179,99 @@
         (when (zerop (decf count))
           (return '(:space)))))))
 
-(defun scan-sharpsign (instance stream quoted)
+(defun scan-sharpsign (stream &optional template)
   (read-char stream nil)
   (do ((ch (read-char stream nil) (read-char stream nil)))
       ((not ch))
     (case ch
       ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
       (#\\
-        (scan-sharpsign-backslash instance stream quoted))
+        (scan-sharpsign-backslash stream template))
       (#\'
-        (return (scan-form instance stream quoted)))
+        (return (scan-form stream template)))
       (#\(
-        (return (scan-forms instance stream quoted)))
+        (return (scan-forms stream template)))
       (#\*
-        (return (scan-sharpsign-asterisk instance stream quoted)))
+        (return (scan-sharpsign-asterisk stream template)))
       (#\:
-        (return (scan-token instance stream quoted)))
+        (return (scan-token stream template)))
       ((#\. #\c #\C #\a #\A #\s #\S #\p #\P #\n #\N #\+ #\-)
-        (return (scan-form instance stream quoted)))
+        (return (scan-form stream template)))
       ((#\b #\B)
-        (return (scan-sharpsign-rational instance stream quoted "01")))
+        (return (scan-sharpsign-rational "01" stream template)))
       ((#\o #\O)
-        (return (scan-sharpsign-rational instance stream quoted "01234567")))
+        (return (scan-sharpsign-rational "01234567" stream template)))
       ((#\x #\X)
-        (return (scan-sharpsign-rational instance stream quoted "0123456789abcdef")))
+        (return (scan-sharpsign-rational "0123456789abcdef" stream template)))
       ((#\r #\R)
-        (return (scan-sharpsign-rational instance stream quoted "0123456789abcdefghijklmnopqrstuvwxyz")))
+        (return (scan-sharpsign-rational "0123456789abcdefghijklmnopqrstuvwxyz" stream template)))
       (#\|
-        (return (scan-sharpsign-vertical-bar instance stream quoted)))
+        (return (scan-sharpsign-vertical-bar stream template)))
       (otherwise ; Either the sharpsign not followed by anything or we don't know what it is.
         (return '(:form))))))
 
-(defun scan-chunk (instance stream quoted &optional completed-form-count template)
+(defun scan-chunk (stream &optional template)
   (when-let ((ch (peek-char nil stream nil)))
     (case ch
       (#\Newline
         (read-char stream nil)
-        (scan-indent instance stream quoted))
+        (scan-indent stream template))
       (#\"
-        (scan-string instance stream quoted))
+        (scan-string stream template))
       (#\;
-        (scan-line-comment instance stream quoted))
+        (scan-line-comment stream template))
       (#\#
-        (scan-sharpsign instance stream quoted))
+        (scan-sharpsign stream template))
       ((#\Space #\Tab)
         (read-char stream nil)
         '(:space))
       (#\'
         (read-char stream nil)
-        (scan-form instance stream t))
+        (scan-form stream '(:quoted t)))
       ((#\` #\@ #\,)
         (read-char stream nil)
-        (scan-form instance stream quoted))
+        (scan-form stream template))
       ((#\( #\[)
         (read-char stream nil)
-        (scan-forms instance stream quoted
-                    (when template
-                      (if (< completed-form-count (getf template :count))
-                        (getf template :primary)
-                        (getf template :secondary)))))
+        (scan-forms stream template))
       ((#\) #\])
         (read-char stream nil)
         '(:exit))
       (otherwise
-        (scan-token instance stream quoted)))))
+        (scan-token stream template)))))
 
-(defun scan-form (instance stream quoted)
-  (do ((chunk (scan-chunk instance stream quoted) (scan-chunk instance stream quoted)))
+(defun scan-form (stream &optional template)
+  (do ((chunk (scan-chunk stream template) (scan-chunk stream template)))
       ((not chunk))
     (unless (eql (car chunk) :space)
       (return chunk))))
 
-(defun scan-forms (instance stream quoted &optional template)
+(defun select-template (template completed-form-count)
+  (cond
+    ((or (not template) (getf template :quoted))
+      template)
+    ((< completed-form-count (getf template :count 0))
+      (getf template :primary))
+    (t
+      (getf template :secondary))))
+
+(defun scan-forms (stream &optional template)
   (with-slots (column) stream
     (do* ((indent column)
           (primary-indent (+ 3 indent))
           (secondary-indent (1+ indent))
           (completed-form-count -1)
           (previous-column column column)
-          (form (scan-chunk instance stream quoted completed-form-count template)
-                (scan-chunk instance stream quoted completed-form-count template)))
+          (form (scan-chunk stream (select-template template completed-form-count))
+                (scan-chunk stream (select-template template completed-form-count))))
          ((not form))
       (case (car form)
         (:indent
           (setf column
             (cond
-              ((not template) indent)
-              ((>= completed-form-count (getf template :count))
+              ((or (not template) (getf template :quoted))
+                indent)
+              ((>= completed-form-count (getf template :count 0))
                 secondary-indent)
               (t primary-indent)))
           (dotimes (k column)
@@ -282,26 +279,26 @@
         (:form
           (incf completed-form-count)
           (cond
-            ((and (not quoted) (not template) (zerop completed-form-count) (cadr form))
-              (setf template (indent-template instance (cadr form))))
-            ((and template (not (zerop (getf template :count))) (= 1 completed-form-count))
+            ((and (not template) (not (getf template :quoted)) (zerop completed-form-count) (cadr form))
+              (setf template (indent-template (cadr form))))
+            ((and template (not (zerop (getf template :count 0))) (= 1 completed-form-count))
               (setf primary-indent previous-column))
-            ((and template (= (1+ (getf template :count)) completed-form-count))
+            ((and template (= (1+ (getf template :count 0)) completed-form-count))
               (setf secondary-indent previous-column)))
           (when (and template
                      (member (uiop:standard-case-symbol-name (cadr form)) (getf template :ignore)
                              :test #'string=)
-                     (<= completed-form-count (getf template :count)))
+                     (<= completed-form-count (getf template :count 0)))
             (decf completed-form-count)))
         (:exit
           (return '(:form)))))))
 
-(defun indentify (instance &optional input-stream output-stream)
+(defun indentify (&optional input-stream output-stream)
   (let ((stream (make-instance 'transform-stream
-                              :input-stream (or input-stream *standard-input*)
-                              :output-stream (or output-stream *standard-output*))))
-    (scan-indent instance stream nil)
+                               :input-stream (or input-stream *standard-input*)
+                               :output-stream (or output-stream *standard-output*))))
+    (scan-indent stream)
     (dotimes (k (column stream))
       (write-char #\Space stream))
-    (scan-forms instance stream nil)))
+    (scan-forms stream)))
 
