@@ -1,6 +1,6 @@
 (in-package :cl-indentify)
 
-(defparameter *indent-templates* (make-hash-table :test 'equalp))
+(defparameter *indent-templates* (make-hash-table :test #'equal))
 
 (defun number-token-p (token)
   (handler-case (numberp (read-from-string token nil))
