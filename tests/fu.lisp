@@ -49,7 +49,8 @@
    (gronk :accessor gronk
           :initarg :gronk)))
 
-(let ((f 1)
+(let (e
+      (f 1)
       (g 1))
   (print f))
 

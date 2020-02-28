@@ -1,7 +1,7 @@
 (in-package :cl-indentify)
 
 (defclass synchronized-stream (trivial-gray-streams:fundamental-character-output-stream
-                            trivial-gray-streams:fundamental-character-input-stream)
+                               trivial-gray-streams:fundamental-character-input-stream)
   ((input-stream
      :accessor input-stream
      :initarg :input-stream)

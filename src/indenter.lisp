@@ -46,10 +46,12 @@
       :test #'string=)))
 
 (defun normalize-template (template)
-  (let ((new-template (list :count (getf template :count 0))))
+  (let ((new-template (list :quoted (getf template :quoted))))
     (when-let ((ig (getf template :ignore)))
       (setf (getf new-template :ignore)
         (mapcan #'symbol-names ig)))
+    (when-let ((c (getf template :count)))
+      (setf (getf new-template :count) c))
     (when-let ((primary (getf template :primary)))
       (setf (getf new-template :primary)
         (normalize-template primary)))
