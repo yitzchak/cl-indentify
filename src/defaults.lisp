@@ -1,7 +1,8 @@
 (in-package :cl-indentify)
 
 (defparameter +common-lisp-templates+
-  '((assert :count 2)
+  '((assert :count 2 :primary (nil
+                               (:style :list)))
     (block :count 0)
     (case :count 1 :secondary ((:count 0)))
     (catch :count 1)
@@ -11,7 +12,7 @@
     (decf :count 1)
     (defclass :count 2 :primary ((:style :list)))
     (defconstant :count 1)
-    (defgeneric :count 2)
+    (defgeneric :count 2 :primary ((:style :list)))
     (define-compiler-macro :count 2)
     (define-condition :count 1)
     (define-method-combination :count 2)

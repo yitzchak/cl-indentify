@@ -84,3 +84,10 @@
   (setf (echo stream) t)
   '(:indent))
 
+(assert (and (= (array-rank a) (array-rank b) 2)
+             (= (array-dimension a 1) (array-dimension b 0)))
+        (a
+         b)
+  "Cannot multiply ~S by ~S." a b)
+
+
