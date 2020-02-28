@@ -51,7 +51,8 @@
 
 (let (e
       (f 1)
-      (g 1))
+      (g (fu 2
+             3)))
   (print f))
 
 (let* ((f 1)

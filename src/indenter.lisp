@@ -11,7 +11,7 @@
   (unless (number-token-p name)
     (gethash (uiop:standard-case-symbol-name name)
              *indent-templates*
-             '(:count 0))))
+             '(:style :call :count 0))))
 
 (defgeneric (setf indent-template) (value name))
 
@@ -46,7 +46,7 @@
       :test #'string=)))
 
 (defun normalize-template (template)
-  (let ((new-template (list :quoted (getf template :quoted))))
+  (let ((new-template (list :style (getf template :style :call))))
     (when-let ((ig (getf template :ignore)))
       (setf (getf new-template :ignore)
         (mapcan #'symbol-names ig)))
@@ -54,10 +54,10 @@
       (setf (getf new-template :count) c))
     (when-let ((primary (getf template :primary)))
       (setf (getf new-template :primary)
-        (normalize-template primary)))
+        (mapcar #'normalize-template primary)))
     (when-let ((secondary (getf template :secondary)))
       (setf (getf new-template :secondary)
-        (normalize-template secondary)))
+        (mapcar #'normalize-template secondary)))
     new-template))
 
 (defmethod (setf indent-template) (value (sym symbol))
@@ -104,7 +104,7 @@
         ((or (not ch)
              (and (char/= ch #\Space)
                   (char/= ch #\Tab)))
-                  '(:indent))
+         '(:indent))
       (read-char stream nil))))
 
 (defun scan-line-comment (stream &optional template)
@@ -228,7 +228,7 @@
         '(:space))
       (#\'
         (read-char stream nil)
-        (scan-form stream '(:quoted t)))
+        (scan-form stream '(:style :quote)))
       ((#\` #\@ #\,)
         (read-char stream nil)
         (scan-form stream template))
@@ -247,14 +247,25 @@
     (unless (eql (car chunk) :space)
       (return chunk))))
 
+(defun select-subtemplate (pos templates)
+  (unless (minusp pos)
+    (or (nth pos templates)
+        (car (last templates)))))
+
 (defun select-template (template completed-form-count)
-  (cond
-    ((or (not template) (getf template :quoted))
-      template)
-    ((< completed-form-count (getf template :count 0))
-      (getf template :primary))
-    (t
-      (getf template :secondary))))
+  (let ((style (getf template :style))
+        (primary-form-count (getf template :count 0)))
+    (cond
+      ((or (not template) (eql style :list))
+        nil)
+      ((eql style :quote)
+        template)
+      ((< completed-form-count primary-form-count)
+        (select-subtemplate completed-form-count
+                            (getf template :primary)))
+      (t
+        (select-subtemplate (- completed-form-count primary-form-count)
+                            (getf template :secondary))))))
 
 (defun write-indent (stream)
   (dotimes (k (column stream))
@@ -274,7 +285,7 @@
         (:indent
           (setf column
             (cond
-              ((or (not template) (getf template :quoted))
+              ((not (eql (getf template :style) :call))
                 indent)
               ((>= completed-form-count (getf template :count 0))
                 secondary-indent)
@@ -283,7 +294,7 @@
         (:form
           (incf completed-form-count)
           (cond
-            ((and (not template) (not (getf template :quoted)) (zerop completed-form-count) (cadr form))
+            ((and (not template) (zerop completed-form-count) (cadr form))
               (setf template (indent-template (cadr form))))
             ((and template (not (zerop (getf template :count 0))) (= 1 completed-form-count))
               (setf primary-indent previous-column))
