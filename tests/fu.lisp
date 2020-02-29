@@ -19,7 +19,7 @@
   (3 5))
 
 (block
-  a
+    a
   b)
 
 (if a
@@ -43,11 +43,15 @@
       x)))
 
 (defclass foo ()
-  ((wibble
+  (zap
+   (wibble
      :accessor wibble
      :initarg :wibble)
    (gronk :accessor gronk
-          :initarg :gronk)))
+          :initarg :gronk))
+  (:metaclass bar)
+  (:documentation
+    "Kilroy was here."))
 
 (let (e
       (f 1)
@@ -90,4 +94,8 @@
          b)
   "Cannot multiply ~S by ~S." a b)
 
-
+(macrolet ((fudge (z)
+             `(if flag (* ,z ,z) ,z)))
+  (+ x
+     (fudge x)
+     (fudge (+ x 1))))
