@@ -99,3 +99,8 @@
   (+ x
      (fudge x)
      (fudge (+ x 1))))
+
+(with-slots (a b c
+             d e f) (wibble 3)
+  (quux 1)
+  (kilroy 7))
