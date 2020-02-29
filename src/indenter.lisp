@@ -88,32 +88,33 @@
 
 (defun scan-string (stream &optional template)
   (declare (ignore template))
-  (read-char stream nil)
-  (do ((ch (read-char stream nil) (read-char stream nil)))
-      ((not ch))
-    (case ch
-      (#\\
-        (read-char stream nil))
-      (#\"
-        (return '(:form))))))
+  (with-verbatim stream
+    (read-char stream nil)
+    (do ((ch (read-char stream nil) (read-char stream nil)))
+        ((not ch))
+      (case ch
+        (#\\
+          (read-char stream nil))
+        (#\"
+          (return '(:form)))))))
 
 (defun scan-indent (stream &optional template)
   (declare (ignore template))
-  (without-echo stream
-    (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
-        ((or (not ch)
-             (and (char/= ch #\Space)
-                  (char/= ch #\Tab)))
-         '(:indent))
-      (read-char stream nil))))
+  (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
+      ((or (not ch)
+           (and (char/= ch #\Space)
+                (char/= ch #\Tab)))
+       '(:indent))
+    (read-char stream nil)))
 
 (defun scan-line-comment (stream &optional template)
   (declare (ignore template))
-  (read-char stream nil)
-  (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
-      ((or (not ch) (char= ch #\Newline)))
-    (read-char stream nil))
-  '(:space))
+  (with-verbatim stream
+    (read-char stream nil)
+    (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
+        ((or (not ch) (char= ch #\Newline)))
+      (read-char stream nil))
+    '(:space)))
 
 (defun scan-token (stream &optional template)
   (declare (ignore template))
@@ -168,17 +169,18 @@
 
 (defun scan-sharpsign-vertical-bar (stream &optional template)
   (declare (ignore template))
-  (do* ((prev-ch nil ch)
-        (ch (read-char stream nil) (read-char stream nil))
-        (count 1))
-       ((not ch))
-    (cond
-      ((not prev-ch))
-      ((and (char= prev-ch #\#) (char= ch #\|))
-        (incf count))
-      ((and (char= prev-ch #\|) (char= ch #\#))
-        (when (zerop (decf count))
-          (return '(:space)))))))
+  (with-verbatim stream
+    (do* ((prev-ch nil ch)
+          (ch (read-char stream nil) (read-char stream nil))
+          (count 1))
+         ((not ch))
+      (cond
+        ((not prev-ch))
+        ((and (char= prev-ch #\#) (char= ch #\|))
+          (incf count))
+        ((and (char= prev-ch #\|) (char= ch #\#))
+          (when (zerop (decf count))
+            (return '(:space))))))))
 
 (defun scan-sharpsign (stream &optional template)
   (read-char stream nil)
@@ -267,30 +269,25 @@
         (select-subtemplate (- completed-form-count primary-form-count)
                             (getf template :secondary))))))
 
-(defun write-indent (stream)
-  (dotimes (k (column stream))
-    (write-char #\Space stream)))
-
 (defun scan-forms (stream &optional template)
-  (with-slots (column) stream
-    (do* ((indent column)
+  (with-slots (input-column) stream
+    (do* ((indent input-column)
           (primary-indent (+ 3 indent))
           (secondary-indent (1+ indent))
           (completed-form-count -1)
-          (previous-column column column)
+          (previous-column input-column input-column)
           (form (scan-chunk stream (select-template template completed-form-count))
                 (scan-chunk stream (select-template template completed-form-count))))
          ((not form))
       (case (car form)
         (:indent
-          (setf column
+          (setf input-column
             (cond
               ((not (eql (getf template :style) :call))
                 indent)
               ((>= completed-form-count (getf template :count 0))
                 secondary-indent)
-              (t primary-indent)))
-          (write-indent stream))
+              (t primary-indent))))
         (:form
           (incf completed-form-count)
           (cond
@@ -309,10 +306,9 @@
           (return '(:form)))))))
 
 (defun indentify (&optional input-stream output-stream)
-  (let ((stream (make-instance 'synchronized-stream
+  (let ((stream (make-instance 'verbatim-stream
                                :input-stream (or input-stream *standard-input*)
                                :output-stream (or output-stream *standard-output*))))
     (scan-indent stream)
-    (write-indent stream)
     (scan-forms stream)))
 

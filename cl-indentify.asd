@@ -10,7 +10,7 @@
       :serial t
       :components
         ((:file "package")
-         (:file "synchronized-stream")
+         (:file "verbatim-stream")
          (:file "defaults")
          (:file "indenter")))))
 
