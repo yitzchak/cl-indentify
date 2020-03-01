@@ -104,3 +104,6 @@
              d e f) (wibble 3)
   (quux 1)
   (kilroy 7))
+
+(quote (1 2
+        3))

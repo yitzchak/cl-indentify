@@ -165,36 +165,88 @@
   '((asdf:defsystem :count 1)))
 
 (defparameter +uiop-templates+
-  '((uiop:while-collecting :count 1)
-    (uiop:with-current-directory :count 1)
-    (uiop:with-deprecation :count 1)
-    (uiop:with-enough-pathname :count 1)
-    (uiop:with-fatal-condition-handler :count 1)
-    (uiop:with-input :count 1)
-    (uiop:with-muffled-compiler-conditions :count 1)
-    (uiop:with-muffled-conditions :count 1)
-    (uiop:with-muffled-loader-conditions :count 1)
-    (uiop:with-null-input :count 1)
-    (uiop:with-null-output :count 1)
-    (uiop:with-output :count 1)
-    (uiop:with-safe-io-syntax :count 1)
-    (uiop:with-saved-deferred-warnings :count 1)
-    (uiop:with-staging-pathname :count 1)
-    (uiop:with-temporary-file :count 1)
-    (uiop:with-upgradability :count 1)))
+  '((uiop:while-collecting :count 1 :sub (nil
+                                          (:style :list)
+                                          nil))
+    (uiop:with-current-directory :count 1 :sub (nil
+                                                (:style :list)
+                                                nil))
+    (uiop:with-deprecation :count 1 :sub (nil
+                                          (:style :list)
+                                          nil))
+    (uiop:with-enough-pathname :count 1 :sub (nil
+                                              (:count 1)
+                                              nil))
+    (uiop:with-fatal-condition-handler :count 1 :sub (nil
+                                                      (:style :list)
+                                                      nil))
+    (uiop:with-input :count 1 :sub (nil
+                                    (:count 1)
+                                    nil))
+    (uiop:with-muffled-compiler-conditions :count 1 :sub (nil
+                                                          (:style :list)
+                                                          nil))
+    (uiop:with-muffled-conditions :count 1 :sub (nil
+                                                 (:style :list)
+                                                 nil))
+    (uiop:with-muffled-loader-conditions :count 1 :sub (nil
+                                                        (:style :list)
+                                                        nil))
+    (uiop:with-null-input :count 1 :sub (nil
+                                         (:count 1)
+                                         nil))
+    (uiop:with-null-output :count 1 :sub (nil
+                                          (:count 1)
+                                          nil))
+    (uiop:with-output :count 1 :sub (nil
+                                     (:count 1)
+                                     nil))
+    (uiop:with-safe-io-syntax :count 1 :sub (nil
+                                             (:style :list)
+                                             nil))
+    (uiop:with-saved-deferred-warnings :count 1 :sub (nil
+                                                      (:count 1)
+                                                      nil))
+    (uiop:with-staging-pathname :count 1 :sub (nil
+                                               (:count 1)
+                                               nil))
+    (uiop:with-temporary-file :count 1 :sub (nil
+                                             (:count 1)
+                                             nil))
+    (uiop:with-upgradability :count 1 :sub (nil
+                                            (:style :list)
+                                            nil))))
 
 (defparameter +alexandria-templates+
-  '((alexandria:cswitch :count 1 :sub (nil nil (:count 0)))
-    (alexandria:destructuring-case :count 1 :sub (nil nil (:count 0)))
-    (alexandria:destructuring-ccase :count 1 :sub (nil nil (:count 0)))
-    (alexandria:destructuring-ecase :count 1 :sub (nil nil (:count 0)))
-    (alexandria:eswitch :count 1 :sub (nil nil (:count 0)))
-    (alexandria:if-let :count 1)
-    (alexandria:named-lambda :count 2)
-    (alexandria:once-only :count 1)
-    (alexandria:switch :count 1 :sub (nil nil (:count 0)))
-    (alexandria:when-let :count 1)
-    (alexandria:when-let* :count 1)
-    (alexandria:with-gensyms :count 1)
-    (alexandria:with-unique-names :count 1)))
+  '((alexandria:cswitch :count 1 :sub (nil nil
+                                       (:count 0)))
+    (alexandria:destructuring-case :count 1 :sub (nil nil
+                                                  (:count 0)))
+    (alexandria:destructuring-ccase :count 1 :sub (nil nil
+                                                   (:count 0)))
+    (alexandria:destructuring-ecase :count 1 :sub (nil nil
+                                                   (:count 0)))
+    (alexandria:eswitch :count 1 :sub (nil nil
+                                       (:count 0)))
+    (alexandria:if-let :count 1 :sub (nil
+                                      (:style :list :sub ((:count 0)))
+                                      nil))
+    (alexandria:named-lambda :count 2 :sub (nil nil
+                                            (:style :list) nil))
+    (alexandria:once-only :count 1 :sub (nil
+                                         (:style :list) nil))
+    (alexandria:switch :count 1 :sub (nil nil
+                                      (:count 0)))
+    (alexandria:when-let :count 1 :sub (nil
+                                        (:style :list :sub ((:count 0)))
+                                        nil))
+    (alexandria:when-let* :count 1 :sub (nil
+                                         (:style :list :sub ((:count 0)))
+                                         nil))
+    (alexandria:with-gensyms :count 1 :sub (nil
+                                            (:style :list)
+                                            nil))
+    (alexandria:with-unique-names :count 1 :sub (nil
+                                                 (:style :list)
+                                                 nil)))
 
