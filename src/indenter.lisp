@@ -271,14 +271,16 @@
          ((not form))
       (case (car form)
         (:indent
-          (let ((style (getf template :style)))
+          (let ((style (getf template :style))
+                (count (getf template :count 0)))
             (setf input-column
                   (cond
                     ((or (not style) (eql style :quote) (eql style :list)
                          (and (eql style :tag)
+                              (> completed-form-count count)
                               (symbol-char-p (peek-char nil stream nil))))
                       indent)
-                    ((> completed-form-count (getf template :count 0))
+                    ((> completed-form-count count)
                       secondary-indent)
                     (t primary-indent)))))
         (:form
