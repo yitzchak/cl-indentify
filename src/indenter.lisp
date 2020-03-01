@@ -122,7 +122,7 @@
       (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
           ((not ch))
         (case ch
-          ((#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\;)
+          ((#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\; #\")
             (return))
           (otherwise
             (read-char stream nil)
@@ -256,6 +256,9 @@
     (select-subtemplate completed-form-count (getf template :sub))
     template))
 
+(defun symbol-char-p (char)
+  (not (member char '(#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\" #\;) :test #'char=)))
+
 (defun scan-forms (stream &optional template)
   (with-slots (input-column) stream
     (do* ((indent input-column)
@@ -268,13 +271,16 @@
          ((not form))
       (case (car form)
         (:indent
-          (setf input-column
-                (cond
-                  ((not (eql (getf template :style) :call))
-                    indent)
-                  ((> completed-form-count (getf template :count 0))
-                    secondary-indent)
-                  (t primary-indent))))
+          (let ((style (getf template :style)))
+            (setf input-column
+                  (cond
+                    ((or (not style) (eql style :quote) (eql style :list)
+                         (and (eql style :tag)
+                              (symbol-char-p (peek-char nil stream nil))))
+                      indent)
+                    ((> completed-form-count (getf template :count 0))
+                      secondary-indent)
+                    (t primary-indent)))))
         (:form
           (cond
             ((and (not template) (zerop completed-form-count) (cadr form))

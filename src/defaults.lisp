@@ -56,29 +56,29 @@
     (destructuring-bind :count 2 :sub (nil nil
                                        (:style :list)
                                        nil))
-    (do-all-symbols :count 1 :sub (nil
+    (do-all-symbols :style :tag :count 1 :sub (nil
+                                               (:count 0)
+                                               nil))
+    (do :style :tag :count 2 :sub (nil
+                                   (:style :list :sub ((:count 0)))
                                    (:count 0)
-                                   nil)) ; tag
-    (do :count 2 :sub (nil
-                       (:style :list :sub ((:count 0)))
-                       (:count 0)
-                       nil)) ; tag
-    (do* :count 2 :sub (nil
-                        (:style :list :sub ((:count 0)))
-                        (:count 0)
-                        nil)) ; tag
-    (do-external-symbols :count 1 :sub (nil
+                                   nil))
+    (do* :style :tag :count 2 :sub (nil
+                                    (:style :list :sub ((:count 0)))
+                                    (:count 0)
+                                    nil))
+    (do-external-symbols :style :tag :count 1 :sub (nil
+                                                    (:count 0)
+                                                    nil))
+    (dolist :style :tag :count 1 :sub (nil
+                                       (:count 0)
+                                       nil))
+    (do-symbols :style :tag :count 1 :sub (nil
+                                           (:count 0)
+                                           nil))
+    (dotimes :style :tag :count 1 :sub (nil
                                         (:count 0)
-                                        nil)) ; tag
-    (dolist :count 1 :sub (nil
-                           (:count 0)
-                           nil)) ; tag
-    (do-symbols :count 1 :sub (nil
-                               (:count 0)
-                               nil)) ; tag
-    (dotimes :count 1 :sub (nil
-                            (:count 0)
-                            nil)) ; tag
+                                        nil))
     (ecase :count 1 :sub (nil nil
                           (:count 0)))
     (etypecase :count 1 :sub (nil nil
@@ -113,17 +113,17 @@
     (multiple-value-bind :count 2 :sub (nil nil
                                         (:style :list)
                                         nil))
-    (prog :count 1 :sub (nil
-                         (:style :list :sub ((:count 0)))
-                         nil)) ; tag
-    (prog* :count 1 :sub (nil
-                          (:style :list :sub ((:count 0)))
-                          nil)) ; tag
+    (prog :style :tag :count 1 :sub (nil
+                                     (:style :list :sub ((:count 0)))
+                                     nil))
+    (prog* :style :tag :count 1 :sub (nil
+                                      (:style :list :sub ((:count 0)))
+                                      nil))
     (progv :count 2)
     (quote :count 0 :sub (nil
                           (:style :quote)))
     (:shadowing-import-from :count 1)
-    (tagbody :count 0) ; tag
+    (tagbody :style :tag :count 0)
     (typecase :count 1 :sub (nil nil
                              (:count 0)))
     (unless :count 1)
@@ -248,5 +248,5 @@
                                             nil))
     (alexandria:with-unique-names :count 1 :sub (nil
                                                  (:style :list)
-                                                 nil)))
+                                                 nil))))
 

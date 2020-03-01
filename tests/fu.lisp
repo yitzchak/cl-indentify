@@ -107,3 +107,17 @@
 
 (quote (1 2
         3))
+
+(tagbody
+  (quux 1)
+ fu
+  (bar 2)
+  (go fu))
+
+(prog (a
+       (e 1))
+  (quux 1)
+ fu
+  (bar 2)
+  (go fu))
+
