@@ -91,7 +91,7 @@
                                  (:style :list :sub ((:count 0)))
                                  nil))
     (handler-case :count 1 :sub (nil nil
-                                 (:count 1)))
+                                 (:count 1 :style :tag)))
     (if :count 1)
     (:import-from :count 1)
     (labels :count 1 :sub (nil
@@ -110,9 +110,9 @@
     (macrolet :count 1 :sub (nil
                              (:style :list :sub ((:count 1)))
                              nil))
-    (multiple-value-bind :count 2 :sub (nil nil
+    (multiple-value-bind :count 2 :sub (nil
                                         (:style :list)
-                                        nil))
+                                        nil nil))
     (prog :style :tag :count 1 :sub (nil
                                      (:style :list :sub ((:count 0)))
                                      nil))

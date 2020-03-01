@@ -248,13 +248,14 @@
       (return chunk))))
 
 (defun select-subtemplate (pos templates)
-  (or (nth pos templates)
-      (car (last templates))))
+  (if (>= pos (length templates))
+    (car (last templates))
+    (nth pos templates)))
 
 (defun select-template (template completed-form-count)
-  (if (and template (not (eql :quote (getf template :style :call))))
-    (select-subtemplate completed-form-count (getf template :sub))
-    template))
+  (if (eql :quote (getf template :style :quote))
+    template
+    (select-subtemplate completed-form-count (getf template :sub))))
 
 (defun symbol-char-p (char)
   (not (member char '(#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\" #\;) :test #'char=)))
