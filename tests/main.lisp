@@ -9,19 +9,23 @@
   (cl-indentify:load-default-templates))
 
 (defun indentify-string (value)
-  (with-output-to-string (output-stream)
-    (with-input-from-string (input-stream value)
-      (cl-indentify:indentify input-stream output-stream))))
+  (with-input-from-string (input-stream value)
+    (cl-indentify:indentify input-stream)))
 
 (deftest verbatim-tokens
-  (testing "Verbatim Tokens"
-    (ok (string= (indentify-string "\"
+  (ok (outputs (indentify-string "\"
 \"") "\"
 \"")
-      "Tabs and newlines are preserved in strings.")
-    (ok (string= (indentify-string "; ") "; ")
-      "Tabs are preserved in comments.")
-    (ok (string= (indentify-string "#|
+    "Tabs and newlines are preserved in strings.")
+  (ok (outputs (indentify-string "; ") "; ")
+    "Tabs are preserved in comments.")
+  (ok (outputs (indentify-string "#|
 |#") "#|
 |#")
-      "Tabs and newlines are preserved in block comments.")))    
+    "Tabs and newlines are preserved in block comments."))
+
+
+(deftest quote-style
+  (ok (outputs (indentify-string "'(a b
+    1 2)") "'(a b
+  1 2)")))

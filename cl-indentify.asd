@@ -12,7 +12,8 @@
         ((:file "package")
          (:file "verbatim-stream")
          (:file "defaults")
-         (:file "indenter")))))
+         (:file "indenter"))))
+  :in-order-to ((test-op (test-op "cl-indentify/tests"))))
 
 (asdf:defsystem "cl-indentify/tests"
   :description "Test system for cl-indentify"
