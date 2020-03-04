@@ -16,6 +16,11 @@
       (with-input-from-string (input-stream input)
         (cl-indentify:indentify input-stream output-stream)))))
 
+(defmacro with-indent-templates (templates &body body)
+  `(let ((cl-indentify:*indent-templates* (make-hash-table :test #'equal)))
+     (cl-indentify::load-templates ,templates)
+     ,@body))
+
 (deftest verbatim-tokens
   (ok (indentify #"\"\n\t\"")
     "Tabs and newlines are preserved in strings.")
@@ -29,5 +34,12 @@
     "Verify that tabs are turned into spaces"))
 
 (deftest quote-style
-  (ok (indentify #"'(a b\n1 2)" #"'(a b\n  1 2)")
-    "Simple quoted indented correctly"))
+  (ok (indentify #"'(a b\n1 (2\n3))" #"'(a b\n  1 (2\n     3))")
+    "Simple quoted indented correctly")
+  (ok
+    (indentify #"(quote (a b\n1 (2\n3)))" #"(quote (a b\n        1 (2\n           3)))")
+    "Quote for quote form")
+  (ok
+    (with-indent-templates (("q" :style :quote))
+      (indentify #"(q (a b\n1 (2\n3)))" #"(q (a b\n    1 (2\n       3)))"))
+    "Quote style for arbitrary lambda"))
