@@ -4,6 +4,7 @@
     :when-let
     :with-gensyms)
   (:export
+    #:*indent-templates*
     #:indenter
     #:indentify
     #:indent-template

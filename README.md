@@ -1,7 +1,6 @@
 # cl-indentify
 
-A library and command line utility to automatically indent Common Lisp source
-files.
+A library and command line utility to automatically indent Common Lisp source files.
 
 # Installation
 
@@ -18,35 +17,50 @@ Inspired by [scmindent/lispindent][] cl-indentify attempts to deal with more
 complex indention by using with a template system that can specify the
 indention characteristics of subforms in addition to the top level form.
 
-cl-indentify calculates indention based on the number of subforms in a "primary"
-group and the number of subforms in a "secondary" group. For example, `do*`
-is defined to have 2 subforms in the primary group and the remaining in th
-secondary group. The primary group is indented by four columns and the secondary
-group is indented by two columns by default.
+Templates are generally selected by the head form of a list. For example, in
+the following cl-indentify will attempt to select a template with a key name
+of `"LET"`.
 
 ```common-lisp
-(do*
-    ((fu 0 (+1 fu))) 
-    ((= fu 10) bar)
-  wibble
-  quux)
+(let
+    ((fu 1)
+     (bar 2))
+  (+ fu bar))
 ```
 
-If the first subform is on the same line as `do*` the following subforms
+Templates can configure a number of aspects of the indention characteristic, but
+the main behavior is controlled by the template `:style` key. 
+
+## `:call` Style
+
+The default style
+is `:call` which calculates indention based a fixed length "primary" group and
+a variable "secondary" group. For example, `with-slots` is defined to have two subforms 
+in the primary group and the remaining in the secondary group. The primary group 
+is indented by four columns and the secondary group is indented by two columns 
+by default.
+
+```common-lisp
+(with-slots
+    (fu bar) wibble
+  (quux bar)
+  (+ fu bar))
+```
+
+If the first subform is on the same line as `with-slots` the following subforms
 that begin on a newline are aligned with the first subform.
 
 ```common-lisp
-(do* ((fu 0 (+1 fu))) 
-     ((= fu 10) bar)
-  wibble
-  quux)
+(with-slots (fu bar)
+            wibble
+  (quux bar)
+  (+ fu bar))
 ```
 
 Likewise, if the first secondary subform is on the same line as the last primary
 subform the following subforms that begin on a newline are aligned with the 
-first secondary subform. This is demonstrated by `if` which has a primary
-count of 1. When the "then" clause is on its own line the following is the
-result.
+first secondary subform. This can be seen in the case of `if` which has a
+primary count of one. Normally would be indented as
 
 ```common-lisp
 (if fu
@@ -63,18 +77,97 @@ clause will be aligned to the "then" clause.
        quux)
 ```
 
-If the first subform in a list is determined to a literal, a list, or if the
-form is quoted then indention will be by one column so that all items aligned
-after the leading left paren.
+If a template cannot be found for the head subform then the `:call` style is
+assumed with a primary count of zero.
+
+The template for subforms can be explicitly specified using the `:sub` key.
+The value is a list of templates or a `nil` if the default template should be
+used. For `:call` and `:tag` style the first item in the list should always be
+a `nil` as this is the template for head subform. This is only used for `:list`
+styles. If the length of the `:sub` value is less then the length of the form
+then the last item in `:sub` will be used. 
+
+For example, the template for `cond` is the following, which specifies that all
+secondary group subforms will have a style of `:call` with a primary count of
+zero.
+
+```common-lisp
+(:style :call
+ :count 0
+ :sub (nil
+       (:style :call
+        :count 0)))
+```
+
+This results in
+
+```common-lisp
+(cond
+  ((not ch)
+    :eof)
+  ((char= ch #\!)
+    :bang)
+  (t
+    ch))
+```
+
+## `:tag` Style
+
+`:tag` style behaves exactly as `:call` in respect to primary and secondary 
+groups, but will align tag names that appear in special forms such as `tagbody` 
+with the head subform. For example `do*`
+
+```common-lisp
+(do* ((pos 0 (1+ pos))
+      (wibble 7))
+     ((= pos 20))
+  (when (= pos 20)
+    (go fu))
+  (format t "~A~%" pos)
+ fu
+  (format t "~A~%" wibble))
+```
+
+## `:quote` Style
+
+`:quote` style will indent the form and any subforms as if it a quoted literal.
+List subforms will aligned the head subform.
 
 ```common-lisp
 (1
  2
  3)
 
-'(fu
-  bar
-  3)
+'(fu bar
+  3
+  (wibble
+   quux))
+```
+
+## `:list` Style
+
+`:list` style is like `:quote` style but subforms will be indented according
+to their own templates or may be specified by the `:sub` key as in `:call`. For
+example, `let` has its primary subform style as `:list` with the following 
+template
+
+```common-lisp
+(:style :call
+ :count 1
+ :sub (nil
+       (:style :list
+        :sub ((:style :call :count 0)))
+       nil))
+```
+
+This results in
+
+```common-lisp
+(let (quux
+      (fu 1)
+      (bar
+        (wibble 7)))
+  (+ fu bar))
 ```
 
 Becuase the indention characteristics of subforms can also be specified this
@@ -149,15 +242,23 @@ count. `case` is defined to have a primary count of one and secondary forms
 are defined to have a primary count of zero.
 
 ```common-lisp
-(defun :count 2)
-(defmethod :count 2 :ignore (:before :after :around))
-(case :count 1 :secondary (:count 0))
-```
+(defun :style :call
+       :count 2
+       :sub (nil nil
+             (:style :list)
+             nil))
 
-Templates can be nested so the following would be legal.
+(defmethod :style :call
+           :count 2 
+           :ignore (:before :after :around) 
+           :sub ((:style :list)
+                 (:style :list)
+                 nil))
 
-```common-lisp
-(fu :count 1 :primary (:count 2) :secondary (:count 0 :secondary (:count 1)))
+(case :style :call
+      :count 1 
+      :sub (nil nil 
+            (:style :call :count 0)))
 ```
 
 [scmindent/lispindent]: https://github.com/ds26gte/scmindent
