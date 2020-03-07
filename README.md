@@ -170,25 +170,6 @@ This results in
   (+ fu bar))
 ```
 
-Becuase the indention characteristics of subforms can also be specified this
-behavior can be overriden so that forms such as `cond` or `case` will have a
-primary count of one even if the leading subform is a literal.
-
-```common-lisp
-(cond
-  ((eql fu 'bar)
-    wibble)
-  (t
-    quux))
-    
-(case gronk
-  (1 baz
-     zap)
-  (743
-    zip
-    bang))
-```    
-
 # Command Line Usage
 
 Using cl-indentify as a stdin/stdout filter is simple.
@@ -259,6 +240,41 @@ are defined to have a primary count of zero.
       :count 1 
       :sub (nil nil 
             (:style :call :count 0)))
+```
+
+## Editor Usage
+
+Text editors often provide the ability to interface with an external code
+filter/beautifier. The following are instructions for various editors.
+
+### Gnome Builder Usage
+
+Create a file `~/.config/gnome-builder/beautifier_plugin/commonlisp/config.ini`
+with the following contents. Please note that GtkSourceView must support
+Common Lisp syntax highlighting (v4.5.91).
+
+```
+[global]
+default = indentify
+
+[indentify]
+command-pattern = cl-indentify @s@
+name = Indentify
+```
+
+### Vim Usage
+
+To set a local variant of the equal command based on extension add the following
+to `~/.vimrc` or approriate config file.
+
+```
+autocmd bufread,bufnewfile *.lisp,*.asd,*.ros setlocal equalprg=cl-indentify
+```
+
+If you are using the filetype plugin you can use the following
+
+```
+autocmd filetype lisp setlocal equalprg=cl-indentify
 ```
 
 [scmindent/lispindent]: https://github.com/ds26gte/scmindent
