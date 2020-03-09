@@ -18,7 +18,7 @@
 
 (defmacro with-indent-templates (templates &body body)
   `(let ((cl-indentify:*indent-templates* (make-hash-table :test #'equal)))
-     (cl-indentify::load-templates ,templates)
+     (cl-indentify::load-templates (quote ,templates))
      ,@body))
 
 (deftest verbatim-tokens
@@ -31,7 +31,9 @@
 
 (deftest non-verbatim-tokens
   (ok (indentify #"\ta" "        a")
-    "Verify that tabs are turned into spaces"))
+    "Tabs are turned into spaces")
+  (ok (indentify #"\na\n\n")
+    "Newlines are preserved."))
 
 (deftest quote-style
   (ok (indentify #"'(a b\n1 (2\n3))" #"'(a b\n  1 (2\n     3))")
