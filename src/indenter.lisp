@@ -108,7 +108,6 @@
 (defun scan-line-comment (stream &optional template)
   (declare (ignore template))
   (with-verbatim stream
-    (read-char stream nil)
     (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
         ((or (not ch) (char= ch #\Newline)))
       (read-char stream nil))
@@ -119,14 +118,22 @@
   (list
     :form
     (with-output-to-string (token-stream)
-      (do ((ch (peek-char nil stream nil) (peek-char nil stream nil)))
+      (do ((ch (peek-char nil stream nil) (peek-char nil stream nil))
+           (in-escape nil))
           ((not ch))
         (case ch
+          (#\\
+            (write-char (read-char stream nil) token-stream)
+            (write-char (read-char stream nil) token-stream))
+          (#\|
+            (setq in-escape (not in-escape))
+            (write-char (read-char stream nil) token-stream))
           ((#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\; #\")
-            (return))
+            (if in-escape
+              (write-char (read-char stream nil) token-stream)
+              (return)))
           (otherwise
-            (read-char stream nil)
-            (write-char ch token-stream)))))))
+            (write-char (read-char stream nil) token-stream)))))))
 
 (defun scan-sharpsign-backslash (stream &optional template)
   (declare (ignore template))
