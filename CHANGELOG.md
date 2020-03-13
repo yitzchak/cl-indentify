@@ -7,6 +7,7 @@ of how the versioning scheme that this project does not use is clearly superior
 to random natural numbers and how incrementing the minor version number
 indicates backward compatible changes, unless it does not.
 
+- 2020-03-13 — Add style specification to templates
 - 2020-02-22 — Initial release supporting templates with nested template
   support.
 
