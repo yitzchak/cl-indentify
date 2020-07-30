@@ -293,11 +293,15 @@
                     (t primary-indent)))))
         (:form
           (cond
-            ((and (not template) (zerop completed-form-count) (cadr form))
+            ((and (not template)
+                  (zerop completed-form-count) (cadr form))
               (setf template (indent-template (cadr form))))
-            ((and template (not (zerop (getf template :count 0))) (= 1 completed-form-count))
+            ((and template
+                  (not (zerop (getf template :count 0))) (= 1 completed-form-count))
               (setf primary-indent previous-column))
-            ((and template (= (1+ (getf template :count 0)) completed-form-count))
+            ((and template
+                  (> previous-column secondary-indent)
+                  (= (1+ (getf template :count 0)) completed-form-count))
               (setf secondary-indent previous-column)))
           (unless (and template
                        (member (uiop:standard-case-symbol-name (cadr form)) (getf template :ignore)
