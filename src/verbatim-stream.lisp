@@ -1,4 +1,4 @@
-(in-package :cl-indentify)
+(in-package :indentify)
 
 (defclass verbatim-stream (trivial-gray-streams:fundamental-character-output-stream
                            trivial-gray-streams:fundamental-character-input-stream)

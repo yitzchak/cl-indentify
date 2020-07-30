@@ -1,4 +1,4 @@
-(defpackage #:cl-indentify
+(defpackage #:indentify
   (:use :cl)
   (:import-from :alexandria
     :when-let

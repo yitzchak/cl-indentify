@@ -1,24 +1,24 @@
-(defpackage #:cl-indentify/tests
+(defpackage #:indentify/tests
   (:use #:cl
         #:rove))
 
-(in-package #:cl-indentify/tests)
+(in-package #:indentify/tests)
 
 (named-readtables:in-readtable trivesc:readtable)
 
 (setup
-  (cl-indentify:load-default-templates))
+  (indentify:load-default-templates))
 
 (defun indentify (input &optional output)
   (string=
     (or output input)
     (with-output-to-string (output-stream)
       (with-input-from-string (input-stream input)
-        (cl-indentify:indentify input-stream output-stream)))))
+        (indentify:indentify input-stream output-stream)))))
 
 (defmacro with-indent-templates (templates &body body)
-  `(let ((cl-indentify:*indent-templates* (make-hash-table :test #'equal)))
-     (cl-indentify::load-templates (quote ,templates))
+  `(let ((indentify:*indent-templates* (make-hash-table :test #'equal)))
+     (indentify::load-templates (quote ,templates))
      ,@body))
 
 (deftest verbatim-tokens

@@ -1,4 +1,4 @@
-(in-package :cl-indentify)
+(in-package :indentify)
 
 ; Primary count zero is the default so no need to include those.
 (defparameter +common-lisp-templates+

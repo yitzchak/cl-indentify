@@ -1,4 +1,4 @@
-(in-package :cl-indentify)
+(in-package :indentify)
 
 (defparameter *indent-templates* (make-hash-table :test #'equal))
 
