@@ -84,6 +84,11 @@
 (defun load-user-templates ()
   (load-template-file (uiop:xdg-config-home "cl-indentify" "templates.lisp")))
 
+(defun initialize-templates ()
+  (when (zerop (hash-table-count *indent-templates*))
+    (load-default-templates)
+    (load-user-templates)))
+
 (defun scan-string (stream &optional template)
   (declare (ignore template))
   (with-verbatim stream
