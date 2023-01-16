@@ -11,6 +11,7 @@
     #:initialize-templates
     #:load-default-templates
     #:load-template-file
+    #:load-templates
     #:load-user-templates))
 
 
