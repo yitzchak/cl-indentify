@@ -5,6 +5,7 @@
     :with-gensyms)
   (:export
     #:*indent-templates*
+    #:*non-token-characters*
     #:indenter
     #:indentify
     #:indent-template

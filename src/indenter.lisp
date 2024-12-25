@@ -2,6 +2,9 @@
 
 (defparameter *indent-templates* (make-hash-table :test #'equal))
 
+(defvar *non-token-characters*
+  '(#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\; #\"))
+
 (defun number-token-p (token)
   (handler-case (numberp (read-from-string token nil))
     (reader-error ()
@@ -133,12 +136,11 @@
           (#\|
             (setq in-escape (not in-escape))
             (write-char (read-char stream nil) token-stream))
-          ((#\Space #\Tab #\Newline #\( #\) #\' #\` #\, #\@ #\; #\")
-            (if in-escape
-              (write-char (read-char stream nil) token-stream)
-              (return)))
           (otherwise
-            (write-char (read-char stream nil) token-stream)))))))
+           (if (or in-escape
+                   (not (position ch *non-token-characters*)))
+               (write-char (read-char stream nil) token-stream)
+             (return))))))))
 
 (defun scan-sharpsign-backslash (stream &optional template)
   (declare (ignore template))
